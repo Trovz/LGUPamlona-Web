@@ -1,0 +1,204 @@
+export type User = { id: number; username: string; password: string; role: 'Administrator' | 'HR Staff'; name: string; email: string; lastLogin: string | null }
+export type Employee = {
+  id: number; no: string; first: string; mi: string; last: string; sex: string; civil: string; birth: string;
+  contact: string; email: string; address: string; deptId: number; posId: number; typeId: number; sgId: number;
+  schedId: number; hired: string; status: 'Active' | 'Inactive'; rhu: boolean
+}
+export type LeaveApproval = {
+  id: number; leaveRequestId: number; approvedByUserId: number | null;
+  decision: 'Approved' | 'Rejected'; dateActedOn: string; remarks: string; legacyActor?: string
+}
+export type DB = {
+  v: 2; users: User[]; departments: any[]; types: any[]; salaryGrades: any[]; schedules: any[]; positions: any[];
+  employees: Employee[]; docs: any[]; education: any[]; eligibility: any[]; experience: any[]; promotions: any[];
+  leaveTypes: any[]; credits: any[]; leaves: any[]; leaveApprovals: LeaveApproval[]; overtime: any[]; holidays: any[]; dtr: any[];
+  allowances: any[]; empAllow: any[]; loans: any[]; dedTypes: any[]; periodStatus: Record<string, string>;
+  payroll: any[]; audit: any[]
+}
+
+export function isDB(value: unknown): value is DB {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const data = value as Record<string, unknown>
+  const arrayFields = [
+    'users', 'departments', 'types', 'salaryGrades', 'schedules', 'positions', 'employees', 'docs',
+    'education', 'eligibility', 'experience', 'promotions', 'leaveTypes', 'credits', 'leaves',
+    'overtime', 'holidays', 'dtr', 'allowances', 'empAllow', 'loans', 'dedTypes', 'payroll', 'audit',
+  ]
+  if (data.v !== 2 || !arrayFields.every(field => Array.isArray(data[field]))) return false
+  if (data.leaveApprovals !== undefined && !Array.isArray(data.leaveApprovals)) return false
+  if (!data.periodStatus || typeof data.periodStatus !== 'object' || Array.isArray(data.periodStatus)) return false
+  const records = (field: string) => (data[field] as unknown[]).every(row => row !== null && typeof row === 'object' && !Array.isArray(row))
+  if (!arrayFields.every(records)) return false
+  if (Array.isArray(data.leaveApprovals) && !records('leaveApprovals')) return false
+  const users = data.users as Record<string, unknown>[]
+  const employees = data.employees as Record<string, unknown>[]
+  const salaryGrades = data.salaryGrades as Record<string, unknown>[]
+  const leaveTypes = data.leaveTypes as Record<string, unknown>[]
+  const approvals = (data.leaveApprovals || []) as Record<string, unknown>[]
+  const leaveIds = new Set((data.leaves as Record<string, unknown>[]).map(leave => leave.id))
+  const userIds = new Set(users.map(user => user.id))
+  return users.every(user => typeof user.id === 'number' && typeof user.username === 'string' && ['Administrator', 'HR Staff'].includes(String(user.role)))
+    && employees.every(employee => typeof employee.id === 'number' && typeof employee.no === 'string' && typeof employee.first === 'string' && typeof employee.last === 'string' && ['Active', 'Inactive'].includes(String(employee.status)))
+    && salaryGrades.every(grade => typeof grade.id === 'number' && typeof grade.grade === 'number' && typeof grade.step === 'number' && typeof grade.rate === 'number')
+    && leaveTypes.every(type => typeof type.id === 'number' && typeof type.name === 'string')
+    && approvals.every(approval => typeof approval.id === 'number' && typeof approval.leaveRequestId === 'number'
+      && (approval.approvedByUserId === null || typeof approval.approvedByUserId === 'number')
+      && ['Approved', 'Rejected'].includes(String(approval.decision)) && typeof approval.dateActedOn === 'string'
+      && typeof approval.remarks === 'string' && leaveIds.has(approval.leaveRequestId)
+      && (approval.approvedByUserId === null || userIds.has(approval.approvedByUserId)))
+}
+
+export const DOC_TYPES = ['Appointment Papers', 'Personal Data Sheet', 'PRC License / Eligibility', 'Service Record', 'Medical Certificate', 'Oath of Office']
+export const NAV = [['dashboard', 'Dashboard'], ['employees', 'Employees'], ['leave', 'Leave'], ['dtr', 'DTR'], ['payroll', 'Payroll'], ['account', 'Settings & Account']]
+export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+export const fm = (n: number) => (n < 0 ? '−' : '') + '₱' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+export const fm0 = (n: number) => '₱' + Math.round(n).toLocaleString('en-US')
+export const D = (s: string) => new Date(s + 'T00:00:00')
+export const iso = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+export const todayISO = () => iso(new Date())
+export const fd = (s?: string | null) => s ? D(s).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '—'
+export const fdr = (a: string, b: string) => a === b ? fd(a) : `${D(a).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${D(b).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+export const fdw = (s: string) => D(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })
+export const t12 = (t: string) => { if (!t) return '—'; const [h, m] = t.split(':').map(Number); return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}` }
+export const mins = (t: string) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m }
+export const nid = (a: any[]) => a.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1
+export const ename = (e?: Employee) => e ? `${e.first} ${e.mi ? e.mi + '. ' : ''}${e.last}` : '(removed)'
+export const ini = (e: Employee) => (e.first[0] + e.last[0]).toUpperCase()
+export const sgName = (db: DB, id: number) => { const s = db.salaryGrades.find(x => x.id === id); return s ? `SG-${s.grade} · Step ${s.step}` : '—' }
+export function migrateLeaveApprovals(db: DB): DB {
+  if (Array.isArray(db.leaveApprovals)) return db
+  let nextId = 0
+  db.leaveApprovals = db.leaves.flatMap((leave: any) => {
+    if (!['Approved', 'Rejected'].includes(leave.status)) return []
+    const user = db.users.find(account => account.name === leave.approvedBy || account.username === leave.approvedBy)
+    return [{
+      id: ++nextId,
+      leaveRequestId: leave.id,
+      approvedByUserId: user?.id ?? null,
+      decision: leave.status,
+      dateActedOn: leave.approvedOn || leave.filed || todayISO(),
+      remarks: leave.remarks || '',
+      ...(!user && leave.approvedBy ? { legacyActor: leave.approvedBy } : {}),
+    }]
+  })
+  return db
+}
+export function calcLeaveAccrual(openingBalance: number, balanceAsOf: string, asOf = todayISO()) {
+  const start = new Date(`${balanceAsOf}T00:00:00Z`), end = new Date(`${asOf}T00:00:00Z`)
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) return r2(openingBalance)
+  let months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth()
+  const anniversaryDay = Math.min(start.getUTCDate(), new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate())
+  if (end.getUTCDate() < anniversaryDay) months--
+  return r2(openingBalance + Math.max(0, months) * 1.25)
+}
+
+export function seed(): DB {
+  const db: any = { v: 2 }
+  db.users = [
+    { id: 1, username: 'hr.admin', password: 'admin123', role: 'Administrator', name: 'HR Admin', email: 'hr.admin@pamplona.gov.ph', lastLogin: null },
+    { id: 2, username: 'hr.staff', password: 'staff123', role: 'HR Staff', name: 'HR Staff', email: 'hr.staff@pamplona.gov.ph', lastLogin: null },
+  ]
+  db.departments = ['Mayor’s Office', 'Accounting', 'Treasury', 'Rural Health Unit', 'General Services', 'Engineering Office', 'Municipal HR Office'].map((name, i) => ({ id: i + 1, name }))
+  db.types = ['Permanent', 'Casual', 'Job Order'].map((name, i) => ({ id: i + 1, name }))
+  db.salaryGrades = [[1, 1, 13530], [3, 1, 14061], [14, 4, 33500], [15, 2, 35200], [15, 3, 36619], [18, 1, 43030], [24, 1, 87315]].map(([grade, step, rate], i) => ({ id: i + 1, grade, step, rate }))
+  db.schedules = [{ id: 1, name: '8:00 AM – 5:00 PM', amIn: '08:00', amOut: '12:00', pmIn: '13:00', pmOut: '17:00' }]
+  const positions = [['Administrative Officer IV', 'PLT-ADM-0004'], ['Municipal Accountant', 'PLT-ACC-0001'], ['Nurse II', 'PLT-NUR-0007'], ['Utility Worker I', 'PLT-UTL-0012'], ['Administrative Aide III', 'PLT-ADA-0030'], ['Engineer II', 'PLT-ENG-0003'], ['Midwife II', 'PLT-MID-0005'], ['Driver I', 'PLT-DRV-0002'], ['Administrative Officer II', 'PLT-ADM-0009']]
+  db.positions = positions.map(([title, item], i) => ({ id: i + 1, title, item }))
+  const employees = [
+    ['Maria', 'L', 'Santos', 'Female', 'Married', '1988-02-14', 1, 1, 1, 4, '2015-03-12', 'Active', false],
+    ['Juan', 'P', 'dela Cruz', 'Male', 'Married', '1979-07-30', 2, 2, 1, 7, '2012-06-03', 'Active', false],
+    ['Ana', 'M', 'Reyes', 'Female', 'Married', '1991-04-08', 4, 3, 1, 5, '2018-01-20', 'Active', true],
+    ['Pedro', 'C', 'Bautista', 'Male', 'Single', '1995-11-02', 5, 4, 2, 1, '2021-08-15', 'Active', false],
+    ['Liza', 'R', 'Mercado', 'Female', 'Single', '1998-09-19', 3, 5, 3, 1, '2023-02-01', 'Active', false],
+    ['Carlos', 'T', 'Rivera', 'Male', 'Married', '1985-01-25', 6, 6, 1, 6, '2016-09-09', 'Active', false],
+    ['Elena', 'S', 'Garcia', 'Female', 'Married', '1987-12-05', 4, 7, 1, 3, '2014-11-14', 'Active', true],
+    ['Ramon', 'D', 'Villanueva', 'Male', 'Single', '1993-05-17', 5, 8, 2, 2, '2022-05-02', 'Inactive', false],
+  ]
+  db.employees = employees.map((e: any, i: number) => ({
+    id: i + 1, no: 'EMP-' + String([1, 14, 27, 33, 41, 52, 60, 71][i]).padStart(4, '0'),
+    first: e[0], mi: e[1], last: e[2], sex: e[3], civil: e[4], birth: e[5],
+    contact: '0917 000 00' + String(10 + i), email: `${e[0][0]}.${e[2].replace(/ /g, '')}`.toLowerCase() + '@pamplona.gov.ph',
+    address: `Purok ${i % 5 + 1}, Poblacion, Pamplona, Camarines Sur`, deptId: e[6], posId: e[7], typeId: e[8], sgId: e[9], schedId: 1, hired: e[10], status: e[11], rhu: e[12],
+  }))
+  db.docs = []
+  db.employees.forEach((e: Employee) => DOC_TYPES.forEach((type, j) => db.docs.push({ empId: e.id, type, date: (e.id + j) % 7 === 0 || (e.id === 3 && j === 3) ? null : e.hired })))
+  db.education = [{ id: 1, empId: 3, level: 'College', school: 'Bicol University', course: 'BS Nursing', year: '2012' }, { id: 2, empId: 3, level: 'Secondary', school: 'Pamplona National High School', course: '—', year: '2008' }]
+  db.eligibility = [{ id: 1, empId: 3, name: 'Professional Regulation Commission — Nurse', rating: '82.40', date: '2012-11-18', license: '0712345' }]
+  db.experience = [{ id: 1, empId: 3, agency: 'Bicol Medical Center', position: 'Staff Nurse', from: '2013-02-01', to: '2017-12-31' }]
+  db.promotions = [{ id: 1, empId: 3, date: '2022-01-03', oldPos: 'Nurse I', newPos: 'Nurse II', oldSg: 'SG-11 · Step 4', newSg: 'SG-15 · Step 3' }]
+  db.leaveTypes = [{ id: 1, name: 'Vacation Leave', annual: 15 }, { id: 2, name: 'Sick Leave', annual: 15 }, { id: 3, name: 'Special Privilege Leave', annual: 3 }, { id: 4, name: 'Compensatory Time-Off (CTO)', annual: 0 }]
+  db.credits = []
+  db.employees.forEach((e: Employee) => db.leaveTypes.forEach((t: any) => db.credits.push({ empId: e.id, typeId: t.id, total: t.annual, used: 0 })))
+  const credit = (e: number, t: number) => db.credits.find((c: any) => c.empId === e && c.typeId === t)
+  credit(3, 1).used = 2.5; credit(3, 2).used = 6; credit(3, 4).total = 4; credit(3, 4).used = 1.5
+  db.leaves = [
+    { id: 1, empId: 1, typeId: 1, start: '2026-10-20', end: '2026-10-22', days: 3, reason: 'Family trip', status: 'Pending', filed: '2026-10-12' },
+    { id: 2, empId: 2, typeId: 2, start: '2026-10-21', end: '2026-10-21', days: 1, reason: 'Fever', status: 'Pending', filed: '2026-10-20' },
+    { id: 3, empId: 3, typeId: 4, start: '2026-10-23', end: '2026-10-23', days: 1, reason: 'CTO from overtime', status: 'Approved', filed: '2026-10-19', approvedBy: 'HR Admin', approvedOn: '2026-10-19', remarks: '' },
+    { id: 4, empId: 4, typeId: 3, start: '2026-10-27', end: '2026-10-27', days: 1, reason: 'Personal', status: 'Rejected', filed: '2026-10-22', approvedBy: 'HR Admin', approvedOn: '2026-10-23', remarks: 'Short staffed that day' },
+    { id: 5, empId: 5, typeId: 1, start: '2026-11-03', end: '2026-11-05', days: 3, reason: 'Rest', status: 'Pending', filed: '2026-10-28' },
+  ]
+  db.leaveApprovals = db.leaves.filter((leave: any) => ['Approved', 'Rejected'].includes(leave.status)).map((leave: any, i: number) => ({
+    id: i + 1, leaveRequestId: leave.id, approvedByUserId: 1, decision: leave.status, dateActedOn: leave.approvedOn || leave.filed, remarks: leave.remarks || '',
+  }))
+  db.overtime = [{ id: 1, empId: 3, date: '2026-10-10', hours: 8, cto: 1.25, status: 'Approved' }, { id: 2, empId: 6, date: '2026-10-28', hours: 3, cto: 0.47, status: 'Pending' }]
+  db.holidays = [['2026-11-01', 'All Saints’ Day'], ['2026-11-02', 'All Souls’ Day'], ['2026-11-30', 'Bonifacio Day'], ['2026-12-25', 'Christmas Day'], ['2026-12-30', 'Rizal Day']].map(([date, name], i) => ({ id: i + 1, date, name }))
+  db.dtr = []
+  const addDtr = (empId: number, date: string, amIn: any, amOut: any, pmIn: any, pmOut: any, absent = false) => db.dtr.push({ id: db.dtr.length + 1, empId, date, amIn: amIn || '', amOut: amOut || '', pmIn: pmIn || '', pmOut: pmOut || '', absent: !!absent })
+  addDtr(3, '2026-10-09', '', '', '', '', true)
+  addDtr(3, '2026-10-26', '07:56', '12:01', '12:58', '17:03'); addDtr(3, '2026-10-27', '08:14', '12:00', '13:00', '17:00'); addDtr(3, '2026-10-28', '08:00', '12:00', '13:00', '16:20'); addDtr(3, '2026-10-29', '', '', '', '', true); addDtr(3, '2026-10-30', '07:58', '12:02', '12:59', '17:10')
+  ;[[1, '07:50', '12:00', '12:55', '17:05'], [2, '08:09', '12:00', '13:00', '17:00'], [4, '', '', '', '', true], [5, '07:58', '12:00', '13:02', '17:00'], [6, '08:00', '12:00', '13:00', '17:30'], [7, '07:45', '12:00', '13:00', '17:00']].forEach((r: any) => addDtr(r[0], '2026-10-30', r[1], r[2], r[3], r[4], r[5]))
+  db.allowances = [{ id: 1, name: 'PERA', monthly: 2000 }]
+  db.empAllow = db.employees.filter((e: Employee) => e.typeId !== 3).map((e: Employee) => ({ empId: e.id, allowId: 1 }))
+  db.loans = [{ id: 1, empId: 3, name: 'GSIS Salary Loan', perPeriod: 812 }]
+  db.dedTypes = [{ id: 1, name: 'GSIS', kind: 'pct', value: .09 }, { id: 2, name: 'PhilHealth', kind: 'pct', value: .025 }, { id: 3, name: 'Pag-IBIG', kind: 'flat', value: 200 }]
+  db.periodStatus = {}; db.payroll = []
+  db.audit = [['hr.admin', 'Approved leave request', 'LeaveApproval'], ['hr.admin', 'Processed payroll', 'Payroll'], ['hr.admin', 'Added DTR entry', 'DTR'], ['hr.admin', 'Recorded promotion', 'Promotion']].map((a: any, i: number) => ({ id: i + 1, ts: new Date(Date.now() - i * 36e5).toISOString(), user: a[0], action: a[1], table: a[2], detail: '' }))
+  const p = periodById('2026-10-a')
+  db.employees.filter((e: Employee) => e.status === 'Active').forEach((e: Employee) => createPayroll(db, e, p, 'hr.admin'))
+  return db as DB
+}
+
+export function periods() {
+  const out: any[] = []
+  ;[[2026, 9], [2026, 10], [2026, 11]].forEach(([y, m]) => {
+    const last = new Date(y, m + 1, 0).getDate(), mm = String(m + 1).padStart(2, '0')
+    out.push({ id: `${y}-${mm}-a`, start: `${y}-${mm}-01`, end: `${y}-${mm}-15` }, { id: `${y}-${mm}-b`, start: `${y}-${mm}-16`, end: `${y}-${mm}-${last}` })
+  })
+  out.forEach(p => p.label = fdr(p.start, p.end).replace(/, \d{4}$/, '') + ', ' + p.start.slice(0, 4))
+  return out
+}
+export const periodById = (id: string) => periods().find(p => p.id === id)
+export function calcPay(db: DB, e: Employee, p: any) {
+  const sg = db.salaryGrades.find(s => s.id === e.sgId), monthly = sg ? sg.rate : 0, basic = r2(monthly / 2), hazard = e.rhu ? r2(basic * .1) : 0
+  const other = r2(db.empAllow.filter(a => a.empId === e.id).reduce((s, a) => s + db.allowances.find(x => x.id === a.allowId).monthly / 2, 0))
+  const gross = r2(basic + hazard + other)
+  const daysAbsent = db.dtr.filter(d => d.empId === e.id && d.absent && d.date >= p.start && d.date <= p.end).length
+  const absentDed = r2(daysAbsent * monthly / 22)
+  const items = e.typeId !== 3 ? db.dedTypes.map(t => ({ name: t.name, amount: r2(t.kind === 'pct' ? monthly * t.value / 2 : t.value) })).concat(db.loans.filter(l => l.empId === e.id).map(l => ({ name: l.name, amount: l.perPeriod }))) : []
+  const otherDed = r2(items.reduce((s, i) => s + i.amount, 0))
+  return { empId: e.id, periodId: p.id, monthly, basic, hazard, other, gross, daysAbsent, absentDed, items, otherDed, net: r2(gross - absentDed - otherDed) }
+}
+export function createPayroll(db: DB, e: Employee, p: any, by: string) {
+  const r: any = calcPay(db, e, p); r.id = nid(db.payroll); r.status = 'Processing'; r.processedBy = by; r.processedOn = todayISO(); db.payroll.push(r); return r
+}
+export function calcDtr(db: DB, d: any, schedule = db.schedules[0]) {
+  if (d.absent) return { hours: 0, late: 0, under: 0, status: 'Absent' }
+  const late = Math.max(0, mins(d.amIn) - mins(schedule.amIn)) + Math.max(0, mins(d.pmIn) - mins(schedule.pmIn))
+  const under = Math.max(0, mins(schedule.amOut) - mins(d.amOut)) + Math.max(0, mins(schedule.pmOut) - mins(d.pmOut))
+  const hours = Math.max(0, (mins(d.amOut) - mins(d.amIn)) + (mins(d.pmOut) - mins(d.pmIn))) / 60
+  return { hours: r2(hours), late, under, status: late && under ? 'Late & Undertime' : late ? 'Late' : under ? 'Undertime' : 'Present' }
+}
+export function workdays(db: DB, a: string, b: string) {
+  let n = 0
+  for (let d = D(a); d <= D(b); d.setDate(d.getDate() + 1)) {
+    const w = d.getDay()
+    if (w !== 0 && w !== 6 && !db.holidays.some(h => h.date === iso(d))) n++
+  }
+  return n
+}
+export function loadDB(): DB | null {
+  try { const raw = localStorage.getItem('pamhr.v2'); if (raw) { const data = JSON.parse(raw); if (data?.v === 2) return migrateLeaveApprovals(data) } } catch { /* use sample data */ }
+  return null
+}
+export const saveDB = (db: DB) => { try { localStorage.setItem('pamhr.v2', JSON.stringify(db)) } catch { /* storage may be unavailable */ } }

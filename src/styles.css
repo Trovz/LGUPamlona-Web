@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #16202f;
+  background: #eff7ff;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --bg: #eff7ff;
+  --card: #fff;
+  --ink: #16202f;
+  --muted: #536b85;
+  --line: #d7e6f5;
+  --thead: #eaf4ff;
+  --brand: #256fc0;
+  --side: #dceeff;
+  --side-ink: #173b63;
+  --side-muted: #426487;
+  --side-active: #b9ddff;
+  --side-active-ink: #123b68;
+  --danger: #b3261e;
+  --interactive-hover: #dceeff;
+  --interactive-hover-text: #16202f;
+  --row-hover: #eaf4ff;
+  --toast-success-bg: #e3f4ea;
+  --toast-success-border: #18794e;
+  --toast-success-text: #145c3d;
+  --toast-error-bg: #fce7e4;
+  --toast-error-border: #b3261e;
+  --toast-error-text: #842018;
+  --notice-info-bg: #dceeff;
+  --notice-info-border: #4a91d4;
+  --notice-info-text: #194b78;
+  --notice-warning-bg: #fff0d2;
+  --notice-warning-border: #9a5b00;
+  --notice-warning-text: #754600;
+  --surface-muted: #eaf4ff;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e7ecf5;
+  background: #0e1520;
+  --bg: #0e1520;
+  --card: #162131;
+  --ink: #e7ecf5;
+  --muted: #93a0ba;
+  --line: #26334a;
+  --thead: #1a2739;
+  --brand: #5b94e8;
+  --side: #0a121d;
+  --side-ink: #c9d5ea;
+  --side-muted: #9fb0cc;
+  --side-active: #1d3558;
+  --side-active-ink: #fff;
+  --danger: #b3261e;
+  --interactive-hover: #25477c;
+  --interactive-hover-text: #fff;
+  --row-hover: #222f43;
+  --toast-success-bg: #15372a;
+  --toast-success-border: #4cc08a;
+  --toast-success-text: #b5ebd0;
+  --toast-error-bg: #3d1d19;
+  --toast-error-border: #f08a7e;
+  --toast-error-text: #ffd1cb;
+  --notice-info-bg: #19304f;
+  --notice-info-border: #7faaf0;
+  --notice-info-text: #c5d9fa;
+  --notice-warning-bg: #3b2c10;
+  --notice-warning-border: #e8a33d;
+  --notice-warning-text: #f5d89d;
+  --surface-muted: #1a2739;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.45; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.login-screen-bg {
+  background:
+    radial-gradient(ellipse at 12% 15%, rgba(147, 197, 253, .38), transparent 42%),
+    radial-gradient(ellipse at 88% 85%, rgba(191, 219, 254, .55), transparent 44%),
+    var(--bg);
+}
+.login-brand-panel {
+  background: var(--side);
+  color: var(--side-ink);
+}
+.toast-card { background: var(--card); }
+.toast-success { background: var(--toast-success-bg); border-color: var(--toast-success-border); color: var(--toast-success-text); }
+.toast-error { background: var(--toast-error-bg); border-color: var(--toast-error-border); color: var(--toast-error-text); }
+.toast-message { color: inherit; opacity: .9; }
+.notice-error { background: var(--toast-error-bg); border-color: var(--toast-error-border); color: var(--toast-error-text); }
+.notice-warning { background: var(--notice-warning-bg); border-color: var(--notice-warning-border); color: var(--notice-warning-text); }
+.notice-info { background: var(--notice-info-bg); border-color: var(--notice-info-border); color: var(--notice-info-text); }
+.surface-muted { background: var(--surface-muted); color: var(--ink); }
+.sidebar-ink { color: var(--side-ink); }
+.sidebar-muted { color: var(--side-muted); }
+.sidebar-toggle { border-color: color-mix(in srgb, var(--side-ink) 20%, transparent); color: var(--side-ink); }
+.sidebar-toggle:hover { background: var(--side-active); color: var(--side-active-ink); }
+.sidebar-nav-link { color: var(--side-ink); }
+.sidebar-nav-link:hover,
+.sidebar-nav-link-active { background: var(--side-active); color: var(--side-active-ink); }
+.sidebar-footer { border-color: color-mix(in srgb, var(--side-ink) 15%, transparent); }
+.sidebar-signout { color: var(--side-ink); }
+.sidebar-signout:hover { color: var(--side-active-ink); }
+.control {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 9px 11px;
+  color: var(--ink);
+}
+.control:focus { outline: 2px solid color-mix(in srgb, var(--brand) 35%, transparent); border-color: var(--brand); }
+.avatar {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #e4edfb;
+  color: #1f5fbf;
+  font-weight: 700;
+  font-size: 12px;
+}
