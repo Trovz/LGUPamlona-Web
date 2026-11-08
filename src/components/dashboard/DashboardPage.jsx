@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import AttendanceSummary from './AttendanceSummary';
 import DashboardStatCard from './DashboardStatCard';
 import PendingLeavePanel from './PendingLeavePanel';
@@ -27,9 +28,7 @@ export default function DashboardPage({
           onClick={onAddEmployee}
           type="button"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <Plus aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.8} />
           Add Employee
         </button>
       </div>

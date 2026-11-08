@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react';
+import {
+    CalendarCheck, Check, CheckCircle, CircleAlert, Clock, Copy, Download, Eye,
+    Info, LayoutDashboard, List, LogOut, PanelLeftClose, PanelLeftOpen, Pencil,
+    Plus, RefreshCw, RotateCcw, Trash2, TriangleAlert, UserRound, Users, WalletCards, X,
+} from 'lucide-react';
 import lguLogo from '../lgu_logo.png';
 import DashboardPage from './components/dashboard/DashboardPage';
 import NotificationContainer from './components/notifications/NotificationContainer';
@@ -7,40 +12,23 @@ const classes = (...v) => v.filter(Boolean).join(' ');
 function Button({ children, tone = 'default', size = 'normal', className = '', ...props }) {
     const tones = { default: 'border-line bg-card text-ink hover:border-brand hover:bg-interactive-hover hover:text-interactive-hover-text', primary: 'border-brand bg-brand text-white hover:brightness-95', danger: 'border-danger bg-danger text-white hover:brightness-95', ghost: 'border-transparent bg-transparent text-brand hover:bg-interactive-hover hover:text-interactive-hover-text' };
     const label = typeof children === 'string' ? children.trim().toLowerCase() : '';
-    const icon = label.startsWith('add') || label.startsWith('new ') ? 'add'
+    const icon = label.startsWith('add') || label.startsWith('new ') ? Plus
         : label.startsWith('record') ? 'record'
-            : label.startsWith('edit') || label.startsWith('save') ? 'edit'
-                : label.startsWith('delete') || label.startsWith('remove') ? 'remove'
-                    : label.startsWith('review') ? 'review'
-                        : label.startsWith('approve') ? 'approve'
-                            : label.startsWith('reject') ? 'reject'
-                                : label.startsWith('process') ? 'process'
-                                    : label.startsWith('finalize') ? 'finalize'
-                                        : label.startsWith('copy') ? 'copy'
-                                            : label.startsWith('sign out') ? 'signout'
-                                                : label.startsWith('reset') ? 'reset'
-                                                    : label.startsWith('update') ? 'update'
-                                                        : label.startsWith('mark') ? 'mark'
-                                                            : label.startsWith('confirm') ? 'confirm'
-                                                                : '';
-    const paths = {
-        add: <><path d="M12 5v14M5 12h14" /></>,
-        record: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></>,
-        edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></>,
-        remove: <><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" /></>,
-        review: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
-        approve: <><path d="m5 12 4 4L19 6" /></>,
-        reject: <><path d="m6 6 12 12M18 6 6 18" /></>,
-        process: <><path d="M4 7h16M4 12h16M4 17h16" /><path d="m8 4-4 3 4 3" /></>,
-        finalize: <><path d="m5 12 4 4L19 6" /><path d="M21 12a9 9 0 1 1-2.6-6.4" /></>,
-        copy: <><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></>,
-        signout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
-        reset: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></>,
-        update: <><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.5 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.5-3" /></>,
-        mark: <><path d="m5 12 4 4L19 6" /></>,
-        confirm: <><path d="m5 12 4 4L19 6" /></>,
-    };
-    return <button className={classes('inline-flex items-center justify-center gap-2 rounded-lg border font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50', tones[tone], size === 'small' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-2 text-sm', className)} {...props}>{icon && <svg viewBox="0 0 24 24" className={classes('shrink-0', size === 'small' ? 'h-3.5 w-3.5' : 'h-4 w-4')} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[icon]}</svg>}{children}</button>;
+            : label.startsWith('edit') || label.startsWith('save') ? Pencil
+                : label.startsWith('delete') || label.startsWith('remove') ? Trash2
+                    : label.startsWith('review') ? Eye
+                        : label.startsWith('approve') ? Check
+                            : label.startsWith('reject') ? X
+                                : label.startsWith('process') ? List
+                                    : label.startsWith('finalize') ? CheckCircle
+                                        : label.startsWith('copy') ? Copy
+                                            : label.startsWith('sign out') ? LogOut
+                                                : label.startsWith('reset') ? RotateCcw
+                                                    : label.startsWith('update') ? RefreshCw
+                                                        : label.startsWith('mark') || label.startsWith('confirm') ? Check
+                                                            : null;
+    const Icon = icon === 'record' ? Pencil : icon;
+    return <button className={classes('inline-flex items-center justify-center gap-2 rounded-lg border font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50', tones[tone], size === 'small' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-2 text-sm', className)} {...props}>{Icon && <Icon aria-hidden="true" className={classes('shrink-0', size === 'small' ? 'h-3.5 w-3.5' : 'h-4 w-4')} strokeWidth={1.8} />}{children}</button>;
 }
 function Card({ children, className = '' }) {
     return <section className={classes('min-w-0 overflow-hidden rounded-xl border border-line bg-card shadow-sm', className)}>{children}</section>;
@@ -60,12 +48,8 @@ function Table({ headers, children, empty = 'Nothing to show yet.' }) {
 }
 function Empty({ children }) { return <div className="px-5 py-10 text-center text-sm text-muted">{children}</div>; }
 function Notice({ children, kind = 'info' }) {
-    const icon = kind === 'warning'
-        ? <><path d="M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3l-7.5-13a2 2 0 0 0-3.4-.1Z" /><path d="M12 9v4m0 3h.01" /></>
-        : kind === 'error'
-            ? <><circle cx="12" cy="12" r="9" /><path d="m15 9-6 6m0-6 6 6" /></>
-            : <><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-8h.01" /></>;
-    return <div className={classes('notice flex items-start gap-3 rounded-lg border p-3 text-sm', `notice-${kind}`)} role={kind === 'info' ? undefined : 'alert'}><svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icon}</svg><div>{children}</div></div>;
+    const Icon = kind === 'warning' ? TriangleAlert : kind === 'error' ? CircleAlert : Info;
+    return <div className={classes('notice flex items-start gap-3 rounded-lg border p-3 text-sm', `notice-${kind}`)} role={kind === 'info' ? undefined : 'alert'}><Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><div>{children}</div></div>;
 }
 function Badge({ children }) {
     const tone = ['Approved', 'Finalized', 'Active', 'Present'].includes(children) ? 'bg-green-100 text-green-800' :
@@ -85,12 +69,12 @@ function Tabs({ items, value, onChange }) {
 }
 function Person({ employee }) { return <div className="flex items-center gap-3"><span className="avatar">{ini(employee)}</span><span className="min-w-0"><b className="block truncate">{ename(employee)}</b><small className="text-muted">{employee.no}</small></span></div>; }
 const icons = {
-    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
-    employees: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.4c2 .7 3.5 2.4 3.5 5.6" /></>,
-    leave: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M8 2v4M16 2v4M3 10h18M9 16l2 2 4-4" /></>,
-    dtr: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-    payroll: <><rect x="2" y="6" width="20" height="13" rx="2" /><circle cx="12" cy="12.5" r="2.5" /><path d="M6 10v.01M18 15v.01" /></>,
-    account: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" /></>,
+    dashboard: LayoutDashboard,
+    employees: Users,
+    leave: CalendarCheck,
+    dtr: Clock,
+    payroll: WalletCards,
+    account: UserRound,
 };
 export default function App() {
     const [db, setDb] = useState(() => loadDB() || seed());
@@ -762,7 +746,7 @@ export default function App() {
                 <Card><CardTitle>Backup and Restore</CardTitle><div className="grid max-w-2xl gap-4 p-5">
                     <Notice kind="warning">Backups contain sensitive employee records and account passwords in an unencrypted JSON file. Save them only in a secure, access-controlled location. Restoring replaces all data currently stored in this browser.</Notice>
                     <p className="text-sm text-muted">Backups are JSON files and can be restored in PamHR. Only valid PamHR v2 files are accepted. Restoring signs you out.</p>
-                    {admins ? <div className="flex flex-wrap gap-2"><Button onClick={exportBackup}>Download backup</Button><label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand hover:bg-interactive-hover hover:text-interactive-hover-text focus-within:outline focus-within:outline-2 focus-within:outline-brand"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4" /></svg>Choose backup file<input className="sr-only" type="file" accept=".json,application/json" onChange={selectBackup} /></label></div> : <p className="text-sm text-muted">Backup and restore are available to Administrators only.</p>}
+                    {admins ? <div className="flex flex-wrap gap-2"><Button onClick={exportBackup}>Download backup</Button><label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand hover:bg-interactive-hover hover:text-interactive-hover-text focus-within:outline focus-within:outline-2 focus-within:outline-brand"><Download className="h-4 w-4" aria-hidden="true" />Choose backup file<input className="sr-only" type="file" accept=".json,application/json" onChange={selectBackup} /></label></div> : <p className="text-sm text-muted">Backup and restore are available to Administrators only.</p>}
                     {restoreCandidate && admins && <div className="grid gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
                         <p><b>{restoreFilename}</b> passed the PamHR v2 format check. Restoring it will replace all current employees, leave, attendance, payroll, settings, and account data.</p>
                         <div className="flex flex-wrap gap-2"><Button tone="danger" onClick={restoreBackup}>Restore and replace current data</Button><Button onClick={() => { setRestoreCandidate(null); setRestoreFilename(''); }}>Cancel</Button></div>
@@ -966,8 +950,11 @@ export default function App() {
         <div className={classes('min-h-screen md:grid', collapsed ? 'md:grid-cols-[76px_minmax(0,1fr)]' : 'md:grid-cols-[250px_minmax(0,1fr)]')}>
             {mobileNav && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileNav(false)} />}
             <aside className={classes('sidebar-ink fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col bg-side px-3 py-5 transition-transform md:sticky md:top-0 md:h-screen md:w-auto md:translate-x-0', mobileNav ? 'translate-x-0' : '-translate-x-full', collapsed && 'md:px-2')}>
-                <div className={classes('mb-6 flex items-center gap-2 px-2', collapsed && 'md:flex-col md:items-center md:gap-3 md:px-0')}>{logoVisible && <button type="button" className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" aria-label="Hide LGU Pamplona logo" title="Hide logo" onClick={() => setLogoVisible(false)}><img src={lguLogo} alt="LGU Pamplona seal" className="h-10 w-10 rounded-full bg-white object-contain p-0.5" /></button>}<div className={classes('min-w-0 flex-1', collapsed && 'md:hidden')}><b className="block text-xl">PamHR</b><small className="sidebar-muted block text-xs">LGU Pamplona, Camarines Sur</small></div><button className="sidebar-toggle rounded-lg border p-2" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed} title={collapsed ? 'Expand' : 'Collapse'} onClick={() => setCollapsed(!collapsed)}><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M13 9l3 3-3 3" /></svg></button></div>
-                <nav aria-label="Main" className="grid gap-1">{NAV.map(([key, label]) => <button key={key} title={collapsed ? label : undefined} aria-label={label} aria-current={page === key ? 'page' : undefined} onClick={() => go(key)} className={classes('sidebar-nav-link flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium', page === key && 'sidebar-nav-link-active', collapsed && 'md:justify-center md:px-2')}><svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8">{icons[key]}</svg><span className={collapsed ? 'md:hidden' : ''}>{label}</span></button>)}</nav>
+                <div className={classes('mb-6 flex items-center gap-2 px-2', collapsed && 'md:flex-col md:items-center md:gap-3 md:px-0')}>{logoVisible && <button type="button" className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" aria-label="Hide LGU Pamplona logo" title="Hide logo" onClick={() => setLogoVisible(false)}><img src={lguLogo} alt="LGU Pamplona seal" className="h-10 w-10 rounded-full bg-white object-contain p-0.5" /></button>}<div className={classes('min-w-0 flex-1', collapsed && 'md:hidden')}><b className="block text-xl">PamHR</b><small className="sidebar-muted block text-xs">LGU Pamplona, Camarines Sur</small></div><button className="sidebar-toggle rounded-lg border p-2" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed} title={collapsed ? 'Expand' : 'Collapse'} onClick={() => setCollapsed(!collapsed)}>{collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}</button></div>
+                <nav aria-label="Main" className="grid gap-1">{NAV.map(([key, label]) => {
+                    const Icon = icons[key];
+                    return <button key={key} title={collapsed ? label : undefined} aria-label={label} aria-current={page === key ? 'page' : undefined} onClick={() => go(key)} className={classes('sidebar-nav-link flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium', page === key && 'sidebar-nav-link-active', collapsed && 'md:justify-center md:px-2')}><Icon className="h-5 w-5 shrink-0" /><span className={collapsed ? 'md:hidden' : ''}>{label}</span></button>;
+                })}</nav>
                 <div className={classes('sidebar-footer mt-auto flex items-center gap-3 border-t px-2 pt-4', collapsed && 'md:justify-center')}><span className="avatar">{activeUser.name.split(' ').map((w) => w[0]).join('')}</span><div className={classes('min-w-0 flex-1', collapsed && 'md:hidden')}><b className="block truncate text-sm">{activeUser.name}</b><small className="sidebar-muted text-xs">{activeUser.role}</small></div><button onClick={() => doAction('logout')} className={classes('sidebar-signout text-xs font-semibold', collapsed && 'md:hidden')}>Sign out</button></div>
             </aside>
             <button onClick={() => setMobileNav(true)} aria-label="Open navigation" className="fixed left-3 top-3 z-20 rounded-lg border border-line bg-card p-2 shadow-sm md:hidden"><span className="block h-0.5 w-5 bg-ink" /><span className="my-1 block h-0.5 w-5 bg-ink" /><span className="block h-0.5 w-5 bg-ink" /></button>
