@@ -43,7 +43,7 @@ function Input(props) { return <input {...props} className={classes('control', p
 function Select({ name, options, value, required, ...props }) {
     return <select name={name} defaultValue={value} required={required} className="control" {...props}>{options.map((x) => <option value={x[0]} key={x[0]}>{x[1]}</option>)}</select>;
 }
-function Table({ headers, children, empty = 'Nothing to show yet.' }) {
+function Table({ headers, children }) {
     return <div className="overflow-x-auto"><table className="w-full border-collapse text-left text-sm"><thead><tr>{headers.map((h, i) => <th className="whitespace-nowrap border-b border-line bg-thead px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-muted" key={i}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;
 }
 function Empty({ children }) { return <div className="px-5 py-10 text-center text-sm text-muted">{children}</div>; }
@@ -218,7 +218,6 @@ export default function App() {
     };
     const open = (type, id, extra) => { setPreview(null); setModal({ type, id, extra }); };
     const confirm = (action, id) => open('confirm', id, action);
-    const mutateWithLog = (action, table, detail = '', fn) => update(copy => { fn?.(copy); log(copy, action, table, detail); });
     const showEmployee = (id) => { setEmployeeId(id); setProfileTab('info'); setPage('employees'); window.scrollTo(0, 0); };
     const handleSubmit = (event) => {
         event.preventDefault();
@@ -266,7 +265,6 @@ export default function App() {
                 return notify('Leave credits not updated', 'Enter valid opening balances and a balance date no later than today.', true);
             }
             update(copy => {
-                ;
                 [[1, openingVl], [2, openingSl]].forEach(([typeId, openingBalance]) => {
                     let credit = copy.credits.find(x => x.empId === id && x.typeId === typeId);
                     if (!credit) {
@@ -772,7 +770,7 @@ export default function App() {
         const e = modal.id ? employee(modal.id) : null;
         const options = (values) => values.map(v => [v, v]);
         let title = '', subtitle = '', content = null;
-        const form = (type, children, submitLabel, init) => <form key={`${type}-${modal.id || ''}`} data-form={type} onSubmit={handleSubmit} className="grid gap-4" onChange={type === 'leave' ? event => {
+        const form = (type, children, submitLabel) => <form key={`${type}-${modal.id || ''}`} data-form={type} onSubmit={handleSubmit} className="grid gap-4" onChange={type === 'leave' ? event => {
             const f = event.currentTarget;
             const data = new FormData(f);
             const start = String(data.get('start') || ''), end = String(data.get('end') || ''), employeeId = String(data.get('empId') || ''), leaveType = String(data.get('typeId') || '');

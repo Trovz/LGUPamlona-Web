@@ -174,7 +174,7 @@ export function periods() {
 export const periodById = (id) => periods().find(p => p.id === id);
 export function calcPay(db, e, p) {
     const sg = db.salaryGrades.find(s => s.id === e.sgId), monthly = sg ? sg.rate : 0, basic = r2(monthly / 2), hazard = e.rhu ? r2(basic * .1) : 0;
-    const other = r2(db.empAllow.filter(a => a.empId === e.id).reduce((s, a) => s + db.allowances.find(x => x.id === a.allowId).monthly / 2, 0));
+    const other = r2(db.empAllow.filter(a => a.empId === e.id).reduce((s, a) => s + (db.allowances.find(x => x.id === a.allowId)?.monthly ?? 0) / 2, 0));
     const gross = r2(basic + hazard + other);
     const daysAbsent = db.dtr.filter(d => d.empId === e.id && d.absent && d.date >= p.start && d.date <= p.end).length;
     const absentDed = r2(daysAbsent * monthly / 22);
@@ -194,9 +194,11 @@ export function createPayroll(db, e, p, by) {
 export function calcDtr(db, d, schedule = db.schedules[0]) {
     if (d.absent)
         return { hours: 0, late: 0, under: 0, status: 'Absent' };
-    const late = Math.max(0, mins(d.amIn) - mins(schedule.amIn)) + Math.max(0, mins(d.pmIn) - mins(schedule.pmIn));
-    const under = Math.max(0, mins(schedule.amOut) - mins(d.amOut)) + Math.max(0, mins(schedule.pmOut) - mins(d.pmOut));
-    const hours = Math.max(0, (mins(d.amOut) - mins(d.amIn)) + (mins(d.pmOut) - mins(d.pmIn))) / 60;
+    const late = (d.amIn ? Math.max(0, mins(d.amIn) - mins(schedule.amIn)) : 0) + (d.pmIn ? Math.max(0, mins(d.pmIn) - mins(schedule.pmIn)) : 0);
+    const under = (d.amOut ? Math.max(0, mins(schedule.amOut) - mins(d.amOut)) : 0) + (d.pmOut ? Math.max(0, mins(schedule.pmOut) - mins(d.pmOut)) : 0);
+    const morning = d.amIn && d.amOut ? Math.max(0, mins(d.amOut) - mins(d.amIn)) : 0;
+    const afternoon = d.pmIn && d.pmOut ? Math.max(0, mins(d.pmOut) - mins(d.pmIn)) : 0;
+    const hours = (morning + afternoon) / 60;
     return { hours: r2(hours), late, under, status: late && under ? 'Late & Undertime' : late ? 'Late' : under ? 'Undertime' : 'Present' };
 }
 export function workdays(db, a, b) {
