@@ -1,4 +1,4 @@
-import DashboardPanel from './DashboardPanel';
+import DashboardPanel from './Panel';
 
 export default function AttendanceSummary({ counts, employeeTotal }) {
   return (

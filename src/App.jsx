@@ -5,8 +5,8 @@ import {
     Plus, RefreshCw, RotateCcw, Trash2, TriangleAlert, UserRound, Users, WalletCards, X,
 } from 'lucide-react';
 import lguLogo from './assets/lgu_logo.png';
-import DashboardPage from './components/dashboard/DashboardPage';
-import NotificationContainer from './components/notifications/NotificationContainer';
+import DashboardPage from './components/dashboard/Page';
+import NotificationContainer from './components/notifications/Container';
 import { calcDtr, createPayroll, DOC_TYPES, ename, fd, fdw, fm, fm0, fdr, ini, loadDB, calcLeaveAccrual, isDB, migrateLeaveApprovals, NAV, nid, periodById, periods, r2, saveDB, seed, sgName, todayISO, t12, workdays, } from './domain';
 const classes = (...v) => v.filter(Boolean).join(' ');
 function Button({ children, tone = 'default', size = 'normal', className = '', ...props }) {

@@ -1,5 +1,5 @@
-import DashboardPanel from './DashboardPanel';
-import DashboardTable from './DashboardTable';
+import DashboardPanel from './Panel';
+import DashboardTable from './Table';
 
 export default function PendingLeavePanel({ leaves, onViewAll, onReview }) {
   const action = (

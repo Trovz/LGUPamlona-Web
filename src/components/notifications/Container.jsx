@@ -1,4 +1,4 @@
-import NotificationToast from './NotificationToast';
+import NotificationToast from './Toast';
 
 export default function NotificationContainer({ notifications }) {
   return (

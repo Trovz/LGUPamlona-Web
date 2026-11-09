@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 import AttendanceSummary from './AttendanceSummary';
-import DashboardStatCard from './DashboardStatCard';
+import DashboardStatCard from './StatCard';
 import PendingLeavePanel from './PendingLeavePanel';
 import RecentActivityPanel from './RecentActivityPanel';
 
