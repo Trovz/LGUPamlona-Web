@@ -87,6 +87,8 @@ button { cursor: pointer; }
   background: var(--side);
   color: var(--side-ink);
 }
+.login-input-wrap:has(input:not(:placeholder-shown)) .login-input-icon { opacity: 0; }
+.login-input-icon { transition: opacity 150ms ease; }
 .toast-card { background: var(--card); }
 .toast-success { background: var(--toast-success-bg); border-color: var(--toast-success-border); color: var(--toast-success-text); }
 .toast-error { background: var(--toast-error-bg); border-color: var(--toast-error-border); color: var(--toast-error-text); }

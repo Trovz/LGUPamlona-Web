@@ -934,8 +934,8 @@ export default function App() {
                             <h2 className="text-2xl font-bold">Sign in</h2>
                             <p className="mt-1 text-sm text-muted">Use your PamHR account to continue.</p>
                         </div>
-                        <Field label="Username" required><span className="relative block"><UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" /><Input name="username" autoComplete="username" autoFocus required className="w-full pl-9" /></span></Field>
-                        <Field label="Password" required><span className="relative block"><Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" /><Input name="password" type="password" autoComplete="current-password" required className="w-full pl-9" /></span></Field>
+                        <Field label="Username" required><span className="login-input-wrap relative block"><UserRound className="login-input-icon pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" /><Input name="username" autoComplete="username" autoFocus placeholder=" " required className="w-full pl-9" /></span></Field>
+                        <Field label="Password" required><span className="login-input-wrap relative block"><Lock className="login-input-icon pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" /><Input name="password" type="password" autoComplete="current-password" placeholder=" " required className="w-full pl-9" /></span></Field>
                         {loginError && <Notice kind="error">{loginError}</Notice>}
                         <Button type="submit" tone="primary" className="w-full"><LogIn className="h-4 w-4" aria-hidden="true" />Sign in</Button>
                         <Notice><><b>Demo accounts</b><br />hr.admin / admin123 (Administrator)<br />hr.staff / staff123 (HR Staff)</></Notice>
