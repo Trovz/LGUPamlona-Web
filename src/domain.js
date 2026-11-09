@@ -164,7 +164,7 @@ export function seed() {
 }
 export function periods() {
     const out = [];
-    [[2026, 9], [2026, 10], [2026, 11]].forEach(([y, m]) => {
+    Array.from({ length: 12 }, (_, i) => [2026 + Math.floor((9 + i) / 12), (9 + i) % 12]).forEach(([y, m]) => {
         const last = new Date(y, m + 1, 0).getDate(), mm = String(m + 1).padStart(2, '0');
         out.push({ id: `${y}-${mm}-a`, start: `${y}-${mm}-01`, end: `${y}-${mm}-15` }, { id: `${y}-${mm}-b`, start: `${y}-${mm}-16`, end: `${y}-${mm}-${last}` });
     });
@@ -178,7 +178,7 @@ export function calcPay(db, e, p) {
     const gross = r2(basic + hazard + other);
     const daysAbsent = db.dtr.filter(d => d.empId === e.id && d.absent && d.date >= p.start && d.date <= p.end).length;
     const absentDed = r2(daysAbsent * monthly / 22);
-    const items = e.typeId !== 3 ? db.dedTypes.map(t => ({ name: t.name, amount: r2(t.kind === 'pct' ? monthly * t.value / 2 : t.value) })).concat(db.loans.filter(l => l.empId === e.id).map(l => ({ name: l.name, amount: l.perPeriod }))) : [];
+    const items = e.typeId !== 3 ? db.dedTypes.map(t => ({ name: t.name, amount: r2((t.kind === 'pct' ? monthly * t.value : t.value) / 2) })).concat(db.loans.filter(l => l.empId === e.id).map(l => ({ name: l.name, amount: l.perPeriod }))) : [];
     const otherDed = r2(items.reduce((s, i) => s + i.amount, 0));
     return { empId: e.id, periodId: p.id, monthly, basic, hazard, other, gross, daysAbsent, absentDed, items, otherDed, net: r2(gross - absentDed - otherDed) };
 }
