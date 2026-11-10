@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
     CalendarCheck, Check, CheckCircle, CircleAlert, Clock, Copy, Download, Eye,
     Info, LayoutDashboard, List, Lock, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Pencil,
-    Plus, RefreshCw, RotateCcw, Trash2, TriangleAlert, UserRound, Users, WalletCards, X,
+    Plus, Printer, RefreshCw, RotateCcw, Trash2, TriangleAlert, UserRound, Users, WalletCards, X,
 } from 'lucide-react';
 import lguLogo from './assets/lgu_logo.png';
 import DashboardPage from './components/dashboard/Page';
@@ -23,7 +23,8 @@ function Button({ children, tone = 'default', size = 'normal', className = '', .
                                 : label.startsWith('process') ? List
                                     : label.startsWith('finalize') ? CheckCircle
                                         : label.startsWith('copy') ? Copy
-                                            : label.startsWith('sign out') ? LogOut
+                                            : label.startsWith('print') ? Printer
+                                                : label.startsWith('sign out') ? LogOut
                                                 : label.startsWith('reset') ? RotateCcw
                                                     : label.startsWith('update') ? RefreshCw
                                                         : label.startsWith('mark') || label.startsWith('confirm') ? Check
