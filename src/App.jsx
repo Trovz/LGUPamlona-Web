@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     CalendarCheck, Check, CheckCircle, CircleAlert, Clock, Copy, Download, Eye,
     Info, LayoutDashboard, List, Lock, LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Pencil,
@@ -105,6 +106,9 @@ export default function App() {
     const employees = db.employees;
     const employee = (id) => db.employees.find(e => e.id == id);
     const empName = (id) => ename(employee(id));
+    const dedNames = db.dedTypes.map(t => t.name);
+    const dedAmount = (r, name) => r.items.find(i => i.name === name)?.amount ?? 0;
+    const loanAmount = (r) => r.items.filter(i => !dedNames.includes(i.name)).reduce((n, i) => n + i.amount, 0);
     const get = (table, id) => db[table]?.find((x) => x.id == id);
     const credits = (id) => db.leaveTypes.map(t => {
         const c = db.credits.find(x => x.empId == id && x.typeId === t.id) || { total: 0, used: 0 };
@@ -570,7 +574,7 @@ export default function App() {
         }
         if (action === 'csv') {
             const rows = db.payroll.filter(r => r.periodId === payPeriod);
-            const text = [['Employee', 'Basic Pay', 'Hazard Pay', 'Allowances', 'Gross', 'Absent Deduction', 'Late Deduction', 'Other Deductions', 'Net Pay', 'Status'], ...rows.map(r => [empName(r.empId), r.basic, r.hazard, r.other, r.gross, r.absentDed, r.lateDed ?? 0, r.otherDed, r.net, r.status])].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const text = [['Employee', 'Basic Pay', 'Hazard Pay', 'Allowances', 'Gross', 'Absent Deduction', 'Late Deduction', ...dedNames, 'Loans', 'Net Pay', 'Status'], ...rows.map(r => [empName(r.empId), r.basic, r.hazard, r.other, r.gross, r.absentDed, r.lateDed ?? 0, ...dedNames.map(n => dedAmount(r, n)), loanAmount(r), r.net, r.status])].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
             navigator.clipboard?.writeText(text).then(() => notify('CSV copied', 'Payroll register copied to the clipboard.')).catch(() => notify('Clipboard unavailable', 'Please allow clipboard access.', true));
             return;
         }
@@ -711,14 +715,31 @@ export default function App() {
         const status = db.periodStatus[period.id] || (records.length ? 'Processing' : 'No records');
         const sum = (k) => records.reduce((s, r) => s + r[k], 0), selected = records.find(r => r.id === payrollId) || records[0];
         const selectedEmployee = selected && employee(selected.empId);
-        return <><PageTop title="Payroll" subtitle="Payroll period · Payroll · deductions · employee allowances" actions={<><Button onClick={() => doAction('csv')}>Copy as CSV</Button><Button onClick={() => doAction('finalize')}>Finalize Period</Button><Button onClick={() => open('payroll')}>Add Record</Button><Button tone="primary" onClick={() => doAction('process')}>Process Payroll</Button></>} /><div className="mb-4"><Notice kind="warning">Payroll uses sample salary rates and is for demonstration only. Replace them with the LGU-approved salary schedule before relying on payroll amounts.</Notice></div>
+        const money = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const printRows = records.map(r => {
+            const emp = employee(r.empId), dtr = db.dtr.find(d => d.empId === r.empId && d.periodId === period.id);
+            return { r, name: ename(emp), dept: get('departments', emp?.deptId)?.name ?? '—', rate: r.monthly / 22, days: dtr ? dtr.present : null };
+        });
+        const total = (fn) => printRows.reduce((n, row) => n + fn(row.r), 0);
+        const printSheet = createPortal(<div className="print-sheet">
+            <div className="print-head"><img src={lguLogo} alt="" /><div><b>LGU Pamplona, Camarines Sur</b><span>Municipal Human Resource Office</span></div></div>
+            <h1>PAYROLL</h1>
+            <p className="print-period">For the period {period.label}</p>
+            <table><thead><tr><th>No.</th><th>Full name</th><th>Assigned department</th><th>Rate per day</th><th>Days worked</th><th>Gross pay</th><th>Absent</th><th>Late</th>{dedNames.map(n => <th key={n}>{n}</th>)}<th>Loans</th><th>Net pay</th></tr></thead>
+                <tbody>{printRows.map(({ r, name, dept, rate, days }, i) => <tr key={r.id}><td>{i + 1}</td><td className="left">{name}</td><td className="left">{dept}</td><td>{money(rate)}</td><td>{days ?? '—'}</td><td>{money(r.gross)}</td><td>{r.absentDed ? money(r.absentDed) : '—'}</td><td>{r.lateDed ? money(r.lateDed) : '—'}</td>{dedNames.map(n => <td key={n}>{dedAmount(r, n) ? money(dedAmount(r, n)) : '—'}</td>)}<td>{loanAmount(r) ? money(loanAmount(r)) : '—'}</td><td><b>{money(r.net)}</b></td></tr>)}</tbody>
+                <tfoot><tr><td colSpan={5} className="left">TOTAL ({printRows.length} employees)</td><td>{money(total(r => r.gross))}</td><td>{money(total(r => r.absentDed))}</td><td>{money(total(r => r.lateDed ?? 0))}</td>{dedNames.map(n => <td key={n}>{money(total(r => dedAmount(r, n)))}</td>)}<td>{money(total(loanAmount))}</td><td>{money(total(r => r.net))}</td></tr></tfoot></table>
+            <div className="print-sign">{['Prepared by (HR)', 'Checked by (Accounting)', 'Approved by'].map(label => <div key={label}><span className="line" />{label}</div>)}</div>
+            <p className="print-date">Printed {fd(todayISO())}</p>
+        </div>, document.getElementById('print-root'));
+        return <><PageTop title="Payroll" subtitle="Payroll period · Payroll · deductions · employee allowances" actions={<><Button onClick={() => window.print()}>Print</Button><Button onClick={() => doAction('csv')}>Copy as CSV</Button><Button onClick={() => doAction('finalize')}>Finalize Period</Button><Button onClick={() => open('payroll')}>Add Record</Button><Button tone="primary" onClick={() => doAction('process')}>Process Payroll</Button></>} /><div className="mb-4"><Notice kind="warning">Payroll uses sample salary rates and is for demonstration only. Replace them with the LGU-approved salary schedule before relying on payroll amounts.</Notice></div>
             <div className="mb-4 flex flex-wrap gap-2"><Select value={period.id} onChange={(ev) => setPayPeriod(ev.target.value)} options={periods().map(p => [p.id, `Period: ${p.label}`])} /><span className="control inline-flex items-center">Status: {status}</span></div>
             <div className="mb-5 grid gap-4 lg:grid-cols-3"><Stat label="Total Gross" value={fm0(sum('gross'))} hint={`${records.length} employees`} /><Stat label="Total Deductions" value={fm0(sum('absentDed') + sum('lateDed') + sum('otherDed'))} hint="Absences, late, GSIS, PhilHealth, Pag-IBIG, loans" /><Stat label="Total Net Pay" value={fm0(sum('net'))} hint="After deductions" /></div>
-            <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.8fr)_minmax(340px,1fr)]"><Card><CardTitle>Payroll Register</CardTitle>{records.length ? <Table headers={['Employee', 'Basic pay', 'Hazard pay', 'Allowances', 'Gross', 'Absent deduction', 'Late deduction', 'Other deductions', 'Net pay', 'Status']}>{records.map(r => tableRow(<>{cell(empName(r.empId), 'min-w-[180px]')}{cell(fm(r.basic))}{cell(r.hazard ? fm(r.hazard) : '—')}{cell(fm(r.other))}{cell(fm(r.gross))}{cell(r.absentDed ? `−${fm(r.absentDed)}` : '0.00')}{cell(r.lateDed ? `−${fm(r.lateDed)}` : '0.00')}{cell(r.otherDed ? `−${fm(r.otherDed)}` : '—')}{cell(<b>{fm(r.net)}</b>)}{cell(<Badge>{r.status}</Badge>)}</>, r.id, () => setPayrollId(r.id)))}</Table> : <Empty>No payroll records for this period yet. Process payroll to compute active employees.</Empty>}</Card>
+            <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.8fr)_minmax(340px,1fr)]"><Card><CardTitle>Payroll Register</CardTitle>{records.length ? <Table headers={['Employee', 'Basic pay', 'Hazard pay', 'Allowances', 'Gross', 'Absent deduction', 'Late deduction', ...dedNames, 'Loans', 'Net pay', 'Status']}>{records.map(r => tableRow(<>{cell(empName(r.empId), 'min-w-[180px]')}{cell(fm(r.basic))}{cell(r.hazard ? fm(r.hazard) : '—')}{cell(fm(r.other))}{cell(fm(r.gross))}{cell(r.absentDed ? `−${fm(r.absentDed)}` : '0.00')}{cell(r.lateDed ? `−${fm(r.lateDed)}` : '0.00')}{dedNames.map(n => <Fragment key={n}>{cell(dedAmount(r, n) ? `−${fm(dedAmount(r, n))}` : '—')}</Fragment>)}{cell(loanAmount(r) ? `−${fm(loanAmount(r))}` : '—')}{cell(<b>{fm(r.net)}</b>)}{cell(<Badge>{r.status}</Badge>)}</>, r.id, () => setPayrollId(r.id)))}</Table> : <Empty>No payroll records for this period yet. Process payroll to compute active employees.</Empty>}</Card>
                 {selected ? <Card><CardTitle action={admins ? <Button size="small" onClick={() => confirm('deletePayroll', selected.id)}>Remove</Button> : undefined}>Payslip · {ename(selectedEmployee)}</CardTitle>
                     {[['Basic Pay (' + sgName(db, selectedEmployee?.sgId) + ', half-month)', fm(selected.basic)], ['Hazard Pay (RHU)', fm(selected.hazard)], ['Other Allowances', fm(selected.other)], ['Gross Pay', fm(selected.gross)], [`Absent deduction (${selected.daysAbsent} days)`, `−${fm(selected.absentDed)}`], [`Late deduction (${(selected.lateDays ?? 0).toFixed(3)} day)`, `−${fm(selected.lateDed ?? 0)}`], ...selected.items.map((x) => [x.name, `−${fm(x.amount)}`]), ['Net Pay', fm(selected.net)], ['Processed by', `${selected.processedBy} · ${fd(selected.processedOn)}`]].map(([label, value], i) => <div className={classes('flex justify-between gap-3 border-t border-line px-5 py-3 text-sm', ['Gross Pay', 'Net Pay'].includes(label) && 'font-bold')} key={i}><span>{label}</span><b>{value}</b></div>)}
                 </Card> : <Card><Empty>Select a payroll record to see its payslip.</Empty></Card>}
             </div>
+            {printSheet}
         </>;
     };
     const settingsPage = () => {

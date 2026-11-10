@@ -130,3 +130,34 @@ button { cursor: pointer; }
   font-weight: 700;
   font-size: 12px;
 }
+
+#print-root { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 10mm; }
+  html, body { background: #fff !important; }
+  #root { display: none !important; }
+  #print-root { display: block; }
+  .print-sheet { color: #000; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; }
+  .print-head { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .print-head img { height: 44px; width: 44px; object-fit: contain; }
+  .print-head div { display: grid; text-align: center; }
+  .print-head b { font-size: 11pt; }
+  .print-sheet h1 { margin: 8px 0 0; text-align: center; font-size: 13pt; letter-spacing: 2px; }
+  .print-period { margin: 2px 0 8px; text-align: center; font-size: 9pt; }
+  .print-sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .print-sheet thead { display: table-header-group; }
+  .print-sheet th:nth-child(1) { width: 3%; }
+  .print-sheet th:nth-child(2) { width: 13%; }
+  .print-sheet th:nth-child(3) { width: 12%; }
+  .print-sheet tr { break-inside: avoid; }
+  .print-sheet th, .print-sheet td { border: 1px solid #000; padding: 2px 3px; text-align: right; font-size: 6.5pt; overflow-wrap: anywhere; }
+  .print-sheet th { text-align: center; background: #e5e5e5; font-size: 6.5pt; }
+  .print-sheet td { white-space: nowrap; }
+  .print-sheet td.left { text-align: left; white-space: normal; }
+  .print-sheet th { white-space: nowrap; }
+  .print-sheet th:nth-child(3), .print-sheet th:nth-child(4), .print-sheet th:nth-child(5), .print-sheet th:nth-child(6) { white-space: normal; }
+  .print-sheet tfoot td { font-weight: 700; background: #f2f2f2; }
+  .print-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 36px; text-align: center; break-inside: avoid; }
+  .print-sign .line { display: block; height: 28px; margin-bottom: 3px; border-bottom: 1px solid #000; }
+  .print-date { margin-top: 14px; font-size: 7pt; text-align: right; }
+}
