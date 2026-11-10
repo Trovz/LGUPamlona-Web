@@ -2,7 +2,7 @@ import DashboardPanel from './Panel';
 
 export default function AttendanceSummary({ counts, employeeTotal }) {
   return (
-    <DashboardPanel title="Attendance Today">
+    <DashboardPanel title="Attendance This Period">
       <div className="grid gap-4 p-5">
         {Object.entries(counts).map(([label, count]) => (
           <div className="flex items-center gap-3 text-sm" key={label}>

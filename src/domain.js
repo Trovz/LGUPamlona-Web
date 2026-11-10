@@ -143,21 +143,19 @@ export function seed() {
     db.overtime = [{ id: 1, empId: 3, date: '2026-10-10', hours: 8, cto: 1.25, status: 'Approved' }, { id: 2, empId: 6, date: '2026-10-28', hours: 3, cto: 0.47, status: 'Pending' }];
     db.holidays = [['2026-11-01', 'All Saints’ Day'], ['2026-11-02', 'All Souls’ Day'], ['2026-11-30', 'Bonifacio Day'], ['2026-12-25', 'Christmas Day'], ['2026-12-30', 'Rizal Day']].map(([date, name], i) => ({ id: i + 1, date, name }));
     db.dtr = [];
-    const addDtr = (empId, date, amIn, amOut, pmIn, pmOut, absent = false) => db.dtr.push({ id: db.dtr.length + 1, empId, date, amIn: amIn || '', amOut: amOut || '', pmIn: pmIn || '', pmOut: pmOut || '', absent: !!absent });
-    addDtr(3, '2026-10-09', '', '', '', '', true);
-    addDtr(3, '2026-10-26', '07:56', '12:01', '12:58', '17:03');
-    addDtr(3, '2026-10-27', '08:14', '12:00', '13:00', '17:00');
-    addDtr(3, '2026-10-28', '08:00', '12:00', '13:00', '16:20');
-    addDtr(3, '2026-10-29', '', '', '', '', true);
-    addDtr(3, '2026-10-30', '07:58', '12:02', '12:59', '17:10');
-    [[1, '07:50', '12:00', '12:55', '17:05'], [2, '08:09', '12:00', '13:00', '17:00'], [4, '', '', '', '', true], [5, '07:58', '12:00', '13:02', '17:00'], [6, '08:00', '12:00', '13:00', '17:30'], [7, '07:45', '12:00', '13:00', '17:00']].forEach((r) => addDtr(r[0], '2026-10-30', r[1], r[2], r[3], r[4], r[5]));
+    const addDtr = (empId, periodId, absent = 0, lateMin = 0) => {
+        const p = periodById(periodId);
+        db.dtr.push({ id: db.dtr.length + 1, empId, periodId, present: workdays(db, p.start, p.end) - absent, absent, lateMin });
+    };
+    db.employees.filter((e) => e.status === 'Active').forEach((e) => addDtr(e.id, '2026-10-a', e.id === 3 ? 1 : 0, e.id === 2 ? 9 : e.id === 5 ? 25 : 0));
+    addDtr(3, '2026-10-b', 1, 14);
     db.allowances = [{ id: 1, name: 'PERA', monthly: 2000 }];
     db.empAllow = db.employees.filter((e) => e.typeId !== 3).map((e) => ({ empId: e.id, allowId: 1 }));
     db.loans = [{ id: 1, empId: 3, name: 'GSIS Salary Loan', perPeriod: 812 }];
     db.dedTypes = [{ id: 1, name: 'GSIS', kind: 'pct', value: .09 }, { id: 2, name: 'PhilHealth', kind: 'pct', value: .025 }, { id: 3, name: 'Pag-IBIG', kind: 'flat', value: 200 }];
     db.periodStatus = {};
     db.payroll = [];
-    db.audit = [['hr.admin', 'Approved leave request', 'LeaveApproval'], ['hr.admin', 'Processed payroll', 'Payroll'], ['hr.admin', 'Added DTR entry', 'DTR'], ['hr.admin', 'Recorded promotion', 'Promotion']].map((a, i) => ({ id: i + 1, ts: new Date(Date.now() - i * 36e5).toISOString(), user: a[0], action: a[1], table: a[2], detail: '' }));
+    db.audit = [['hr.admin', 'Approved leave request', 'LeaveApproval'], ['hr.admin', 'Processed payroll', 'Payroll'], ['hr.admin', 'Added DTR record', 'DTR'], ['hr.admin', 'Recorded promotion', 'Promotion']].map((a, i) => ({ id: i + 1, ts: new Date(Date.now() - i * 36e5).toISOString(), user: a[0], action: a[1], table: a[2], detail: '' }));
     const p = periodById('2026-10-a');
     db.employees.filter((e) => e.status === 'Active').forEach((e) => createPayroll(db, e, p, 'hr.admin'));
     return db;
@@ -176,11 +174,12 @@ export function calcPay(db, e, p) {
     const sg = db.salaryGrades.find(s => s.id === e.sgId), monthly = sg ? sg.rate : 0, basic = r2(monthly / 2), hazard = e.rhu ? r2(basic * .1) : 0;
     const other = r2(db.empAllow.filter(a => a.empId === e.id).reduce((s, a) => s + (db.allowances.find(x => x.id === a.allowId)?.monthly ?? 0) / 2, 0));
     const gross = r2(basic + hazard + other);
-    const daysAbsent = db.dtr.filter(d => d.empId === e.id && d.absent && d.date >= p.start && d.date <= p.end).length;
-    const absentDed = r2(daysAbsent * monthly / 22);
+    const dtr = db.dtr.find(d => d.empId === e.id && d.periodId === p.id);
+    const daysAbsent = dtr?.absent ?? 0, lateMin = dtr?.lateMin ?? 0, lateDays = cscLateDays(lateMin);
+    const absentDed = r2(daysAbsent * monthly / 22), lateDed = r2(lateDays * monthly / 22);
     const items = e.typeId !== 3 ? db.dedTypes.map(t => ({ name: t.name, amount: r2((t.kind === 'pct' ? monthly * t.value : t.value) / 2) })).concat(db.loans.filter(l => l.empId === e.id).map(l => ({ name: l.name, amount: l.perPeriod }))) : [];
     const otherDed = r2(items.reduce((s, i) => s + i.amount, 0));
-    return { empId: e.id, periodId: p.id, monthly, basic, hazard, other, gross, daysAbsent, absentDed, items, otherDed, net: r2(gross - absentDed - otherDed) };
+    return { empId: e.id, periodId: p.id, monthly, basic, hazard, other, gross, daysAbsent, absentDed, lateMin, lateDays, lateDed, items, otherDed, net: r2(gross - absentDed - lateDed - otherDed) };
 }
 export function createPayroll(db, e, p, by) {
     const r = calcPay(db, e, p);
@@ -191,15 +190,36 @@ export function createPayroll(db, e, p, by) {
     db.payroll.push(r);
     return r;
 }
-export function calcDtr(db, d, schedule = db.schedules[0]) {
-    if (d.absent)
-        return { hours: 0, late: 0, under: 0, status: 'Absent' };
-    const late = (d.amIn ? Math.max(0, mins(d.amIn) - mins(schedule.amIn)) : 0) + (d.pmIn ? Math.max(0, mins(d.pmIn) - mins(schedule.pmIn)) : 0);
-    const under = (d.amOut ? Math.max(0, mins(schedule.amOut) - mins(d.amOut)) : 0) + (d.pmOut ? Math.max(0, mins(schedule.pmOut) - mins(d.pmOut)) : 0);
-    const morning = d.amIn && d.amOut ? Math.max(0, mins(d.amOut) - mins(d.amIn)) : 0;
-    const afternoon = d.pmIn && d.pmOut ? Math.max(0, mins(d.pmOut) - mins(d.pmIn)) : 0;
-    const hours = (morning + afternoon) / 60;
-    return { hours: r2(hours), late, under, status: late && under ? 'Late & Undertime' : late ? 'Late' : under ? 'Undertime' : 'Present' };
+export function cscLateDays(totalMinutes) {
+    const m = Math.max(0, Math.floor(Number(totalMinutes) || 0)), hours = Math.floor(m / 60), rest = m % 60;
+    return (hours * 125 + Math.max(0, Math.ceil(25 * rest / 12 - 0.5))) / 1000;
+}
+export function dtrStatus(record) {
+    if (!record)
+        return 'Not recorded';
+    return record.absent > 0 ? 'Absent' : record.lateMin > 0 ? 'Late' : 'Present';
+}
+export function migrateDtr(db) {
+    if (!db.dtr.some(d => d.date !== undefined))
+        return db;
+    const schedule = db.schedules[0], late = (d) => (d.amIn ? Math.max(0, mins(d.amIn) - mins(schedule.amIn)) : 0) + (d.pmIn ? Math.max(0, mins(d.pmIn) - mins(schedule.pmIn)) : 0);
+    const groups = new Map();
+    db.dtr.filter(d => d.date !== undefined).forEach(d => {
+        const period = periods().find(p => d.date >= p.start && d.date <= p.end);
+        if (!period)
+            return;
+        const key = `${d.empId}|${period.id}`, g = groups.get(key) || { empId: d.empId, periodId: period.id, present: 0, absent: 0, lateMin: 0 };
+        if (d.absent)
+            g.absent++;
+        else {
+            g.present++;
+            g.lateMin += late(d);
+        }
+        groups.set(key, g);
+    });
+    const kept = db.dtr.filter(d => d.date === undefined && d.periodId !== undefined);
+    db.dtr = [...kept, ...groups.values()].map((d, i) => ({ ...d, id: i + 1 }));
+    return db;
 }
 export function workdays(db, a, b) {
     let n = 0;
@@ -216,7 +236,7 @@ export function loadDB() {
         if (raw) {
             const data = JSON.parse(raw);
             if (data?.v === 2)
-                return migrateLeaveApprovals(data);
+                return migrateDtr(migrateLeaveApprovals(data));
         }
     }
     catch { /* use sample data */ }

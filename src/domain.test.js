@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcDtr, calcLeaveAccrual, calcPay, isDB, mins, periods, r2, seed, workdays } from './domain';
+import { calcLeaveAccrual, calcPay, cscLateDays, dtrStatus, isDB, migrateDtr, mins, periodById, periods, r2, seed, workdays } from './domain';
 
 const emp = (db, id) => db.employees.find((e) => e.id === id);
 
@@ -59,7 +59,7 @@ describe('calcPay', () => {
     const jo = emp(db, 5);
     const pay = calcPay(db, jo, period);
     expect(pay.items).toEqual([]);
-    expect(pay.net).toBe(r2(pay.gross - pay.absentDed));
+    expect(pay.net).toBe(r2(pay.gross - pay.absentDed - pay.lateDed));
   });
 
   it('does not crash when an assigned allowance was deleted', () => {
@@ -75,46 +75,104 @@ describe('calcPay', () => {
   });
 });
 
-describe('calcDtr', () => {
-  const db = seed();
-  const base = { amIn: '08:00', amOut: '12:00', pmIn: '13:00', pmOut: '17:00', absent: false };
+describe('cscLateDays', () => {
+    it('converts whole hours at 0.125 day each', () => {
+        expect(cscLateDays(60)).toBe(0.125);
+        expect(cscLateDays(240)).toBe(0.5);
+        expect(cscLateDays(480)).toBe(1);
+    });
 
-  it('marks a full on-time day as Present with 8 hours', () => {
-    expect(calcDtr(db, base)).toEqual({ hours: 8, late: 0, under: 0, status: 'Present' });
-  });
+    it('converts minutes using the CSC table values', () => {
+        expect(cscLateDays(1)).toBe(0.002);
+        expect(cscLateDays(15)).toBe(0.031);
+        expect(cscLateDays(30)).toBe(0.062);
+        expect(cscLateDays(45)).toBe(0.094);
+        expect(cscLateDays(59)).toBe(0.123);
+    });
 
-  it('counts lateness in minutes', () => {
-    const r = calcDtr(db, { ...base, amIn: '08:14' });
-    expect(r.late).toBe(14);
-    expect(r.status).toBe('Late');
-  });
+    it('adds hours and leftover minutes separately', () => {
+        expect(cscLateDays(90)).toBe(0.187);
+        expect(cscLateDays(155)).toBe(0.125 * 2 + 0.073);
+    });
 
-  it('counts undertime in minutes', () => {
-    const r = calcDtr(db, { ...base, pmOut: '16:20' });
-    expect(r.under).toBe(40);
-    expect(r.status).toBe('Undertime');
-  });
+    it('returns zero for no or invalid late time', () => {
+        expect(cscLateDays(0)).toBe(0);
+        expect(cscLateDays(-5)).toBe(0);
+        expect(cscLateDays(undefined)).toBe(0);
+    });
+});
 
-  it('reports Late & Undertime when both apply', () => {
-    expect(calcDtr(db, { ...base, amIn: '08:10', pmOut: '16:50' }).status).toBe('Late & Undertime');
-  });
+describe('dtrStatus', () => {
+    it('reports Not recorded without a record', () => {
+        expect(dtrStatus(undefined)).toBe('Not recorded');
+    });
 
-  it('does not count early arrival or overtime as late or undertime', () => {
-    const r = calcDtr(db, { ...base, amIn: '07:45', pmOut: '17:30' });
-    expect(r.late).toBe(0);
-    expect(r.under).toBe(0);
-  });
+    it('prioritises absences, then late, then present', () => {
+        expect(dtrStatus({ absent: 1, lateMin: 10 })).toBe('Absent');
+        expect(dtrStatus({ absent: 0, lateMin: 10 })).toBe('Late');
+        expect(dtrStatus({ absent: 0, lateMin: 0 })).toBe('Present');
+    });
+});
 
-  it('returns zeros for an absent day', () => {
-    expect(calcDtr(db, { ...base, absent: true })).toEqual({ hours: 0, late: 0, under: 0, status: 'Absent' });
-  });
+describe('late deduction in payroll', () => {
+    it('deducts late using the CSC fraction of the daily rate', () => {
+        const db = seed();
+        const period = periodById('2026-10-a');
+        const e = emp(db, 2);
+        const pay = calcPay(db, e, period);
+        expect(pay.lateMin).toBe(9);
+        expect(pay.lateDays).toBe(0.019);
+        expect(pay.lateDed).toBe(r2(0.019 * pay.monthly / 22));
+        expect(pay.net).toBe(r2(pay.gross - pay.absentDed - pay.lateDed - pay.otherDed));
+    });
 
-  it('treats blank times as no data instead of full undertime', () => {
-    const r = calcDtr(db, { amIn: '', amOut: '', pmIn: '', pmOut: '', absent: false });
-    expect(r.hours).toBe(0);
-    expect(r.under).toBe(0);
-    expect(r.late).toBe(0);
-  });
+    it('has no late or absence deduction when no DTR is recorded', () => {
+        const db = seed();
+        db.dtr = [];
+        const pay = calcPay(db, emp(db, 2), periodById('2026-10-a'));
+        expect(pay.lateDed).toBe(0);
+        expect(pay.absentDed).toBe(0);
+    });
+
+    it('never deducts undertime', () => {
+        const db = seed();
+        expect(Object.keys(db.dtr[0]).sort()).toEqual(['absent', 'empId', 'id', 'lateMin', 'periodId', 'present']);
+    });
+});
+
+describe('seeded DTR', () => {
+    it('has a record for every active employee in October 1-15 that matches its working days', () => {
+        const db = seed();
+        const period = periodById('2026-10-a');
+        const records = db.dtr.filter((d) => d.periodId === period.id);
+        expect(records).toHaveLength(db.employees.filter((e) => e.status === 'Active').length);
+        records.forEach((d) => expect(d.present + d.absent).toBe(workdays(db, period.start, period.end)));
+    });
+});
+
+describe('migrateDtr', () => {
+    const old = (db) => {
+        db.dtr = [
+            { id: 1, empId: 3, date: '2026-10-09', amIn: '', amOut: '', pmIn: '', pmOut: '', absent: true },
+            { id: 2, empId: 3, date: '2026-10-12', amIn: '08:14', amOut: '12:00', pmIn: '13:00', pmOut: '17:00', absent: false },
+            { id: 3, empId: 3, date: '2026-10-13', amIn: '08:00', amOut: '12:00', pmIn: '13:05', pmOut: '17:00', absent: false },
+            { id: 4, empId: 3, date: '2026-10-27', amIn: '08:00', amOut: '12:00', pmIn: '13:00', pmOut: '17:00', absent: false },
+        ];
+        return db;
+    };
+
+    it('turns daily entries into per-period totals', () => {
+        const db = migrateDtr(old(seed()));
+        const a = db.dtr.find((d) => d.periodId === '2026-10-a');
+        expect(a).toMatchObject({ empId: 3, present: 2, absent: 1, lateMin: 19 });
+        expect(db.dtr.find((d) => d.periodId === '2026-10-b')).toMatchObject({ present: 1, absent: 0, lateMin: 0 });
+    });
+
+    it('leaves data already in the new format unchanged', () => {
+        const db = seed();
+        const before = JSON.stringify(db.dtr);
+        expect(JSON.stringify(migrateDtr(db).dtr)).toBe(before);
+    });
 });
 
 describe('calcLeaveAccrual', () => {

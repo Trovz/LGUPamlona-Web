@@ -7,7 +7,7 @@ import {
 import lguLogo from './assets/lgu_logo.png';
 import DashboardPage from './components/dashboard/Page';
 import NotificationContainer from './components/notifications/Container';
-import { calcDtr, createPayroll, DOC_TYPES, ename, fd, fdw, fm, fm0, fdr, ini, loadDB, calcLeaveAccrual, isDB, migrateLeaveApprovals, NAV, nid, periodById, periods, r2, saveDB, seed, sgName, todayISO, t12, workdays, } from './domain';
+import { createPayroll, cscLateDays, dtrStatus, migrateDtr, DOC_TYPES, ename, fd, fm, fm0, fdr, ini, loadDB, calcLeaveAccrual, isDB, migrateLeaveApprovals, NAV, nid, periodById, periods, r2, saveDB, seed, sgName, todayISO, t12, workdays, } from './domain';
 const classes = (...v) => v.filter(Boolean).join(' ');
 function Button({ children, tone = 'default', size = 'normal', className = '', ...props }) {
     const tones = { default: 'border-line bg-card text-ink hover:border-brand hover:bg-interactive-hover hover:text-interactive-hover-text', primary: 'border-brand bg-brand text-white hover:brightness-95', danger: 'border-danger bg-danger text-white hover:brightness-95', ghost: 'border-transparent bg-transparent text-brand hover:bg-interactive-hover hover:text-interactive-hover-text' };
@@ -90,8 +90,7 @@ export default function App() {
     const [leaveTab, setLeaveTab] = useState('requests');
     const [leaveFilter, setLeaveFilter] = useState('');
     const [creditEmployee, setCreditEmployee] = useState(3);
-    const [dtrEmployee, setDtrEmployee] = useState(3);
-    const [dtrMonth, setDtrMonth] = useState('2026-10');
+    const [dtrPeriod, setDtrPeriod] = useState('2026-10-a');
     const [payPeriod, setPayPeriod] = useState('2026-10-a');
     const [payrollId, setPayrollId] = useState(null);
     const [settingsTab, setSettingsTab] = useState('account');
@@ -173,7 +172,7 @@ export default function App() {
             const parsed = JSON.parse(await file.text());
             if (!isDB(parsed))
                 return notify('Invalid backup', 'The file is not a valid PamHR v2 backup. No data was changed.', true);
-            setRestoreCandidate(migrateLeaveApprovals(parsed));
+            setRestoreCandidate(migrateDtr(migrateLeaveApprovals(parsed)));
             setRestoreFilename(file.name);
         }
         catch (error) {
@@ -361,19 +360,27 @@ export default function App() {
             return;
         }
         if (type === 'dtr') {
-            if (D(f.date).getDay() % 6 === 0)
-                return notify('Not a working day', 'Weekends cannot have a DTR entry.', true);
-            if (db.dtr.some(d => d.empId == f.empId && d.date === f.date))
-                return notify('Entry already exists', 'This employee already has a DTR entry for that date. Remove it first to re-enter.', true);
-            const absent = f.absent === 'on', record = { id: nid(db.dtr), empId: +f.empId, date: f.date, amIn: absent ? '' : f.amIn, amOut: absent ? '' : f.amOut, pmIn: absent ? '' : f.pmIn, pmOut: absent ? '' : f.pmOut, absent };
-            if (!absent && !(record.amIn && record.amOut && record.pmIn && record.pmOut))
-                return notify('Missing time logs', 'Enter all four time logs or mark the day as absent.', true);
-            if (!absent && !(record.amIn < record.amOut && record.amOut <= record.pmIn && record.pmIn < record.pmOut))
-                return notify('Check the time logs', 'Times must run in order: AM in, AM out, PM in, PM out.', true);
-            update(copy => { copy.dtr.push(record); log(copy, 'Added DTR entry', 'DTR', `${empName(record.empId)} ${record.date}`); });
-            setDtrEmployee(+f.empId);
-            setDtrMonth(f.date.slice(0, 7));
-            notify('DTR entry added', `${empName(f.empId)} · ${fd(f.date)} · ${calcDtr(db, record).status}`);
+            const period = periodById(f.periodId), present = Math.floor(+f.present), absent = Math.floor(+f.absent);
+            const lateMin = Math.floor(+f.lateHours || 0) * 60 + Math.floor(+f.lateMinutes || 0);
+            if (!period || [present, absent, lateMin].some(n => !Number.isFinite(n) || n < 0))
+                return notify('Check the entries', 'Days and late time cannot be blank or negative.', true);
+            const workingDays = workdays(db, period.start, period.end);
+            if (present + absent > workingDays)
+                return notify('Check the days', `Days present plus days absent cannot be more than the ${workingDays} working days in this period.`, true);
+            if (!id && db.dtr.some(d => d.empId == f.empId && d.periodId === f.periodId))
+                return notify('Record already exists', 'This employee already has a DTR for that period. Use Edit to change it.', true);
+            update(copy => {
+                if (id) {
+                    Object.assign(copy.dtr.find(d => d.id === id), { present, absent, lateMin });
+                    log(copy, 'Updated DTR record', 'DTR', `${empName(+f.empId)} ${period.label}`);
+                }
+                else {
+                    copy.dtr.push({ id: nid(copy.dtr), empId: +f.empId, periodId: f.periodId, present, absent, lateMin });
+                    log(copy, 'Added DTR record', 'DTR', `${empName(+f.empId)} ${period.label}`);
+                }
+            });
+            setDtrPeriod(f.periodId);
+            notify(id ? 'DTR record updated' : 'DTR record added', `${empName(+f.empId)} · ${period.label}`);
             setModal(null);
             return;
         }
@@ -487,9 +494,10 @@ export default function App() {
         }
         if (action === 'deleteDtr') {
             const d = db.dtr.find(x => x.id === id);
-            update(copy => { copy.dtr = copy.dtr.filter(x => x.id !== id); log(copy, 'Removed DTR entry', 'DTR', `${empName(d.empId)} ${d.date}`); });
+            const label = periodById(d.periodId)?.label ?? '';
+            update(copy => { copy.dtr = copy.dtr.filter(x => x.id !== id); log(copy, 'Removed DTR record', 'DTR', `${empName(d.empId)} ${label}`); });
             setModal(null);
-            notify('DTR entry removed', fd(d.date));
+            notify('DTR record removed', `${empName(d.empId)} · ${label}`);
             return;
         }
         if (action === 'deletePayroll') {
@@ -562,7 +570,7 @@ export default function App() {
         }
         if (action === 'csv') {
             const rows = db.payroll.filter(r => r.periodId === payPeriod);
-            const text = [['Employee', 'Basic Pay', 'Hazard Pay', 'Allowances', 'Gross', 'Absent Deduction', 'Other Deductions', 'Net Pay', 'Status'], ...rows.map(r => [empName(r.empId), r.basic, r.hazard, r.other, r.gross, r.absentDed, r.otherDed, r.net, r.status])].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const text = [['Employee', 'Basic Pay', 'Hazard Pay', 'Allowances', 'Gross', 'Absent Deduction', 'Late Deduction', 'Other Deductions', 'Net Pay', 'Status'], ...rows.map(r => [empName(r.empId), r.basic, r.hazard, r.other, r.gross, r.absentDed, r.lateDed ?? 0, r.otherDed, r.net, r.status])].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
             navigator.clipboard?.writeText(text).then(() => notify('CSV copied', 'Payroll register copied to the clipboard.')).catch(() => notify('Clipboard unavailable', 'Please allow clipboard access.', true));
             return;
         }
@@ -579,21 +587,14 @@ export default function App() {
     const rowActions = (...children) => <div className="flex flex-wrap gap-1.5">{children.map((child, i) => <span key={i}>{child}</span>)}</div>;
     const dashboard = () => {
         const active = employees.filter(e => e.status === 'Active').length, pending = db.leaves.filter(l => l.status === 'Pending');
-        const latest = db.dtr.reduce((m, d) => d.date > m ? d.date : m, ''), today = db.dtr.filter(d => d.date === latest);
+        const periodDtr = db.dtr.filter(d => d.periodId === payPeriod && employees.some(e => e.id === d.empId && e.status === 'Active'));
         const statusCounts = { Present: 0, Late: 0, Absent: 0 };
-        today.forEach(d => {
-            const status = calcDtr(db, d).status; if (status === 'Absent')
-                statusCounts.Absent++;
-            else if (status === 'Present')
-                statusCounts.Present++;
-            else
-                statusCounts.Late++;
-        });
+        periodDtr.forEach(d => { statusCounts[dtrStatus(d)]++; });
         const period = periodById(payPeriod), payroll = db.payroll.filter(r => r.periodId === payPeriod);
         const stats = [
             { label: 'Active Employees', value: active, hint: `${db.departments.length} departments` },
             { label: 'Pending Leave Requests', value: pending.length, hint: `${db.overtime.filter(o => o.status === 'Pending').length} overtime pending for CTO` },
-            { label: `Attendance on ${latest ? fd(latest) : '—'}`, value: today.length, hint: `${Math.max(0, active - today.length)} active employees not recorded` },
+            { label: `DTR · ${periodById(payPeriod).label}`, value: periodDtr.length, hint: `${Math.max(0, active - periodDtr.length)} active employees not recorded` },
             { label: `Payroll · ${period.label}`, value: fm0(payroll.reduce((s, r) => s + r.net, 0)), hint: `Demo rates · ${payroll.length} records · net pay` },
         ];
         const pendingLeaves = pending.map(leave => ({
@@ -695,22 +696,14 @@ export default function App() {
         </>;
     };
     const dtrPage = () => {
-        const e = employee(dtrEmployee) || employees[0], [year, month] = dtrMonth.split('-').map(Number), lastDay = new Date(year, month, 0).getDate();
-        const first = `${dtrMonth}-01`, end = `${dtrMonth}-${String(lastDay).padStart(2, '0')}`;
-        const entries = db.dtr.filter(d => d.empId === e.id && d.date >= first && d.date <= end);
-        const holidays = db.holidays.filter(h => h.date >= first && h.date <= end && !entries.some(d => d.date === h.date));
-        const rows = [...entries.map(d => ({ date: d.date, record: d })), ...holidays.map(h => ({ date: h.date, holiday: h }))].sort((a, b) => a.date.localeCompare(b.date));
-        const totals = entries.map(d => calcDtr(db, d)), late = totals.filter(c => c.late), under = totals.filter(c => c.under);
-        const monthWorkdays = workdays(db, first, end), underTotal = totals.reduce((s, x) => s + x.under, 0);
-        return <><PageTop title="Daily Time Record" subtitle="DTR · Holiday · WorkSchedule" actions={<Button tone="primary" onClick={() => open('dtr')}>Add Entry</Button>} />
-            <div className="mb-4 flex flex-wrap gap-2"><Select value={e.id} onChange={(ev) => setDtrEmployee(+ev.target.value)} options={employeeOptions()} /><Input type="month" value={dtrMonth} onChange={(ev) => setDtrMonth(ev.target.value)} /><span className="control inline-flex items-center">Schedule: {get('schedules', e.schedId)?.name}</span></div>
-            <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat label="Days Present" value={entries.filter(d => !d.absent).length} hint={`of ${monthWorkdays} working days`} /><Stat label="Tardiness" value={`${late.reduce((s, c) => s + c.late, 0)} min`} hint={`${late.length} occurrences`} /><Stat label="Undertime" value={`${Math.floor(underTotal / 60)} h ${underTotal % 60} m`} hint={`${under.length} occurrences`} /><Stat label="Days Absent" value={entries.filter(d => d.absent).length} hint="Deducted in payroll" /></div>
-            <Card>{rows.length ? <Table headers={['Date', 'AM in', 'AM out', 'PM in', 'PM out', 'Hours', 'Late (min)', 'Undertime (min)', 'Status', '']}>{rows.map(row => {
-                if (row.holiday)
-                    return tableRow(<>{cell(fdw(row.date))}{cell('—', 'text-muted')}{cell('—')}{cell('—')}{cell('—')}{cell('—')}{cell('—')}{cell('—')}{cell(<Badge>{`${row.holiday.name} (Holiday)`}</Badge>)}{cell('')}</>, row.date);
-                const d = row.record, c = calcDtr(db, d);
-                return tableRow(<>{cell(fdw(d.date))}{cell(d.absent ? '—' : t12(d.amIn))}{cell(d.absent ? '—' : t12(d.amOut))}{cell(d.absent ? '—' : t12(d.pmIn))}{cell(d.absent ? '—' : t12(d.pmOut))}{cell(c.hours.toFixed(1))}{cell(c.late)}{cell(c.under)}{cell(<Badge>{c.status}</Badge>)}{cell(<Button size="small" onClick={() => confirm('deleteDtr', d.id)}>Remove</Button>)}</>, d.id);
-            })}</Table> : <Empty>No time logs for this employee and month. Use Add Entry to record a day.</Empty>}</Card>
+        const period = periodById(dtrPeriod) || periods()[0], workingDays = workdays(db, period.start, period.end);
+        const rows = employees.filter(e => e.status === 'Active').map(e => ({ e, record: db.dtr.find(d => d.empId === e.id && d.periodId === period.id) }));
+        const recorded = rows.filter(r => r.record), absentTotal = recorded.reduce((n, r) => n + r.record.absent, 0), lateTotal = recorded.reduce((n, r) => n + r.record.lateMin, 0);
+        const lateText = (m) => m ? `${Math.floor(m / 60)} h ${m % 60} m` : '—';
+        return <><PageTop title="Daily Time Record" subtitle="DTR · Final days per pay period from the employee’s submitted DTR" actions={<Button tone="primary" onClick={() => open('dtr')}>Add Record</Button>} />
+            <div className="mb-4 flex flex-wrap gap-2"><Select value={period.id} onChange={(ev) => setDtrPeriod(ev.target.value)} options={periods().map(p => [p.id, `Period: ${p.label}`])} /><span className="control inline-flex items-center">Working days: {workingDays}</span></div>
+            <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat label="DTR Recorded" value={`${recorded.length} of ${rows.length}`} hint="Active employees" /><Stat label="Days Absent" value={absentTotal} hint="Deducted in payroll" /><Stat label="Late" value={lateText(lateTotal)} hint="Deducted using the CSC table" /><Stat label="Not Recorded" value={rows.length - recorded.length} hint="Needed before processing payroll" /></div>
+            <Card><Table headers={['Employee', 'Days present', 'Days absent', 'Late', 'Late (days)', 'Status', '']}>{rows.map(({ e, record }) => tableRow(<>{cell(empName(e.id), 'min-w-[180px]')}{cell(record ? record.present : '—')}{cell(record ? record.absent : '—')}{cell(record ? lateText(record.lateMin) : '—')}{cell(record ? cscLateDays(record.lateMin).toFixed(3) : '—')}{cell(<Badge>{dtrStatus(record)}</Badge>)}{cell(record ? rowActions(<Button size="small" onClick={() => open('dtr', record.id)}>Edit</Button>, <Button size="small" onClick={() => confirm('deleteDtr', record.id)}>Remove</Button>) : <Button size="small" onClick={() => open('dtr', undefined, { empId: e.id })}>Add</Button>)}</>, e.id))}</Table></Card>
         </>;
     };
     const payrollPage = () => {
@@ -720,10 +713,10 @@ export default function App() {
         const selectedEmployee = selected && employee(selected.empId);
         return <><PageTop title="Payroll" subtitle="Payroll period · Payroll · deductions · employee allowances" actions={<><Button onClick={() => doAction('csv')}>Copy as CSV</Button><Button onClick={() => doAction('finalize')}>Finalize Period</Button><Button onClick={() => open('payroll')}>Add Record</Button><Button tone="primary" onClick={() => doAction('process')}>Process Payroll</Button></>} /><div className="mb-4"><Notice kind="warning">Payroll uses sample salary rates and is for demonstration only. Replace them with the LGU-approved salary schedule before relying on payroll amounts.</Notice></div>
             <div className="mb-4 flex flex-wrap gap-2"><Select value={period.id} onChange={(ev) => setPayPeriod(ev.target.value)} options={periods().map(p => [p.id, `Period: ${p.label}`])} /><span className="control inline-flex items-center">Status: {status}</span></div>
-            <div className="mb-5 grid gap-4 lg:grid-cols-3"><Stat label="Total Gross" value={fm0(sum('gross'))} hint={`${records.length} employees`} /><Stat label="Total Deductions" value={fm0(sum('absentDed') + sum('otherDed'))} hint="Absences, GSIS, PhilHealth, Pag-IBIG, loans" /><Stat label="Total Net Pay" value={fm0(sum('net'))} hint="After deductions" /></div>
-            <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.8fr)_minmax(340px,1fr)]"><Card><CardTitle>Payroll Register</CardTitle>{records.length ? <Table headers={['Employee', 'Basic pay', 'Hazard pay', 'Allowances', 'Gross', 'Absent deduction', 'Other deductions', 'Net pay', 'Status']}>{records.map(r => tableRow(<>{cell(empName(r.empId), 'min-w-[180px]')}{cell(fm(r.basic))}{cell(r.hazard ? fm(r.hazard) : '—')}{cell(fm(r.other))}{cell(fm(r.gross))}{cell(r.absentDed ? `−${fm(r.absentDed)}` : '0.00')}{cell(r.otherDed ? `−${fm(r.otherDed)}` : '—')}{cell(<b>{fm(r.net)}</b>)}{cell(<Badge>{r.status}</Badge>)}</>, r.id, () => setPayrollId(r.id)))}</Table> : <Empty>No payroll records for this period yet. Process payroll to compute active employees.</Empty>}</Card>
+            <div className="mb-5 grid gap-4 lg:grid-cols-3"><Stat label="Total Gross" value={fm0(sum('gross'))} hint={`${records.length} employees`} /><Stat label="Total Deductions" value={fm0(sum('absentDed') + sum('lateDed') + sum('otherDed'))} hint="Absences, late, GSIS, PhilHealth, Pag-IBIG, loans" /><Stat label="Total Net Pay" value={fm0(sum('net'))} hint="After deductions" /></div>
+            <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.8fr)_minmax(340px,1fr)]"><Card><CardTitle>Payroll Register</CardTitle>{records.length ? <Table headers={['Employee', 'Basic pay', 'Hazard pay', 'Allowances', 'Gross', 'Absent deduction', 'Late deduction', 'Other deductions', 'Net pay', 'Status']}>{records.map(r => tableRow(<>{cell(empName(r.empId), 'min-w-[180px]')}{cell(fm(r.basic))}{cell(r.hazard ? fm(r.hazard) : '—')}{cell(fm(r.other))}{cell(fm(r.gross))}{cell(r.absentDed ? `−${fm(r.absentDed)}` : '0.00')}{cell(r.lateDed ? `−${fm(r.lateDed)}` : '0.00')}{cell(r.otherDed ? `−${fm(r.otherDed)}` : '—')}{cell(<b>{fm(r.net)}</b>)}{cell(<Badge>{r.status}</Badge>)}</>, r.id, () => setPayrollId(r.id)))}</Table> : <Empty>No payroll records for this period yet. Process payroll to compute active employees.</Empty>}</Card>
                 {selected ? <Card><CardTitle action={admins ? <Button size="small" onClick={() => confirm('deletePayroll', selected.id)}>Remove</Button> : undefined}>Payslip · {ename(selectedEmployee)}</CardTitle>
-                    {[['Basic Pay (' + sgName(db, selectedEmployee?.sgId) + ', half-month)', fm(selected.basic)], ['Hazard Pay (RHU)', fm(selected.hazard)], ['Other Allowances', fm(selected.other)], ['Gross Pay', fm(selected.gross)], [`Absent deduction (${selected.daysAbsent} days)`, `−${fm(selected.absentDed)}`], ...selected.items.map((x) => [x.name, `−${fm(x.amount)}`]), ['Net Pay', fm(selected.net)], ['Processed by', `${selected.processedBy} · ${fd(selected.processedOn)}`]].map(([label, value], i) => <div className={classes('flex justify-between gap-3 border-t border-line px-5 py-3 text-sm', ['Gross Pay', 'Net Pay'].includes(label) && 'font-bold')} key={i}><span>{label}</span><b>{value}</b></div>)}
+                    {[['Basic Pay (' + sgName(db, selectedEmployee?.sgId) + ', half-month)', fm(selected.basic)], ['Hazard Pay (RHU)', fm(selected.hazard)], ['Other Allowances', fm(selected.other)], ['Gross Pay', fm(selected.gross)], [`Absent deduction (${selected.daysAbsent} days)`, `−${fm(selected.absentDed)}`], [`Late deduction (${(selected.lateDays ?? 0).toFixed(3)} day)`, `−${fm(selected.lateDed ?? 0)}`], ...selected.items.map((x) => [x.name, `−${fm(x.amount)}`]), ['Net Pay', fm(selected.net)], ['Processed by', `${selected.processedBy} · ${fd(selected.processedOn)}`]].map(([label, value], i) => <div className={classes('flex justify-between gap-3 border-t border-line px-5 py-3 text-sm', ['Gross Pay', 'Net Pay'].includes(label) && 'font-bold')} key={i}><span>{label}</span><b>{value}</b></div>)}
                 </Card> : <Card><Empty>Select a payroll record to see its payslip.</Empty></Card>}
             </div>
         </>;
@@ -758,8 +751,8 @@ export default function App() {
         if (!modal)
             return null;
         if (modal.type === 'confirm') {
-            const titleMap = { deleteEmployee: 'Delete employee?', deleteLeave: 'Remove leave request?', deleteDtr: 'Remove DTR entry?', deletePayroll: 'Remove payroll record?', reset: 'Reset demo data?' };
-            const warning = { deleteEmployee: 'This permanently removes the employee and their 201 file, leave, DTR and payroll records. This action cannot be undone.', deleteLeave: 'This permanently removes the leave request. Approved leave credits are returned.', deleteDtr: 'This permanently removes the time logs for this day. Attendance totals and payroll deductions may change.', deletePayroll: 'This permanently removes the payroll record and payslip for this period.', reset: 'This replaces everything in this browser with the original sample data. This action cannot be undone.' };
+            const titleMap = { deleteEmployee: 'Delete employee?', deleteLeave: 'Remove leave request?', deleteDtr: 'Remove DTR record?', deletePayroll: 'Remove payroll record?', reset: 'Reset demo data?' };
+            const warning = { deleteEmployee: 'This permanently removes the employee and their 201 file, leave, DTR and payroll records. This action cannot be undone.', deleteLeave: 'This permanently removes the leave request. Approved leave credits are returned.', deleteDtr: 'This permanently removes the days and late time for this pay period. Payroll deductions may change.', deletePayroll: 'This permanently removes the payroll record and payslip for this period.', reset: 'This replaces everything in this browser with the original sample data. This action cannot be undone.' };
             const entity = modal.id ? employee(modal.id) : null;
             return <Dialog title={titleMap[modal.extra] || 'Confirm action'} subtitle="Review before continuing." onClose={() => setModal(null)}>
                 {entity && <div className="surface-muted mb-4 rounded-lg p-4"><b>{ename(entity)}</b><div className="mt-1 text-sm text-muted">{entity.no} · {get('positions', entity.posId)?.title}</div></div>}
@@ -781,9 +774,8 @@ export default function App() {
                 setPreview({ kind: 'leave', count, remaining: credit?.remaining || 0, name: credit?.type.name || '' });
             }
         } : type === 'dtr' ? event => {
-            const data = new FormData(event.currentTarget), absent = data.get('absent') === 'on';
-            const record = Object.fromEntries(data.entries());
-            setPreview({ kind: 'dtr', result: calcDtr(db, { ...record, absent }) });
+            const data = new FormData(event.currentTarget);
+            setPreview({ kind: 'dtr', lateDays: cscLateDays((+data.get('lateHours') || 0) * 60 + (+data.get('lateMinutes') || 0)) });
         } : undefined}>
             {children}
             <div className="mt-1 flex justify-end gap-2 border-t border-line pt-4"><Button type="button" onClick={() => setModal(null)}>Cancel</Button><Button type="submit" tone="primary">{submitLabel}</Button></div>
@@ -851,11 +843,13 @@ export default function App() {
                 subtitle = 'Approved overtime earns compensatory time-off (CTO).';
                 content = form('overtime', <><Field label="Employee" required><Select name="empId" options={employeeOptions(false)} value={3} required /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Date worked" required><Input name="date" type="date" defaultValue={todayISO()} required /></Field><Field label="Overtime hours" required><Input name="hours" type="number" min=".5" max="24" step=".5" required /></Field></div><Notice>Sample rule: 1 hour of overtime earns 1.25 hours of CTO. Credit is added once approved.</Notice></>, 'Add Overtime');
                 break;
-            case 'dtr':
-                title = 'Add DTR Entry';
-                subtitle = 'Record the employee’s attendance and time logs for a day.';
-                content = form('dtr', <><Field label="Employee" required><Select name="empId" options={employeeOptions()} value={dtrEmployee} required /></Field><Field label="Date" required><Input name="date" type="date" defaultValue={`${dtrMonth}-01`} required /></Field><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="absent" />Absent (no time logs for this day)</label><div className="grid gap-3 sm:grid-cols-2">{[['AM in', 'amIn'], ['AM out', 'amOut'], ['PM in', 'pmIn'], ['PM out', 'pmOut']].map(([label, name]) => <Field label={label} key={name}><Input name={name} type="time" defaultValue={get('schedules', 1)[name]} /></Field>)}</div>{preview?.kind === 'dtr' && <Notice>Calculated attendance: {preview.result.status} · Hours {preview.result.hours.toFixed(1)} · Late {preview.result.late} min · Undertime {preview.result.under} min</Notice>}<Notice>Hours, tardiness, undertime and status are calculated from the time logs and schedule.</Notice></>, 'Add Entry');
+            case 'dtr': {
+                const record = modal.id ? db.dtr.find(d => d.id === modal.id) : null, lateMin = record?.lateMin ?? 0;
+                title = record ? 'Edit DTR Record' : 'Add DTR Record';
+                subtitle = 'Enter the final days HR computed from the employee’s submitted DTR.';
+                content = form('dtr', <><div className="grid gap-3 sm:grid-cols-2"><Field label="Employee" required><Select name="empId" options={employeeOptions()} value={record?.empId ?? modal.extra?.empId ?? 3} disabled={!!record} required />{record && <input type="hidden" name="empId" value={record.empId} />}</Field><Field label="Pay period" required><Select name="periodId" options={periods().map(p => [p.id, p.label])} value={record?.periodId ?? dtrPeriod} disabled={!!record} required />{record && <input type="hidden" name="periodId" value={record.periodId} />}</Field></div><div className="grid gap-3 sm:grid-cols-2"><Field label="Days present" required><Input name="present" type="number" min="0" max="16" step="1" defaultValue={record?.present} required /></Field><Field label="Days absent" required><Input name="absent" type="number" min="0" max="16" step="1" defaultValue={record?.absent ?? 0} required /></Field><Field label="Late (hours)"><Input name="lateHours" type="number" min="0" step="1" defaultValue={Math.floor(lateMin / 60)} /></Field><Field label="Late (minutes)"><Input name="lateMinutes" type="number" min="0" step="1" defaultValue={lateMin % 60} /></Field></div>{preview?.kind === 'dtr' && <Notice>Late equivalent: {preview.lateDays.toFixed(3)} day (CSC table)</Notice>}<Notice>Late time is converted to a fraction of a day using the CSC table. Undertime is not deducted.</Notice></>, record ? 'Save Changes' : 'Add Record');
                 break;
+            }
             case 'payroll':
                 title = 'Add Payroll Record';
                 subtitle = 'Amounts are computed from salary grade, allowances, DTR absences and deductions.';
