@@ -231,7 +231,7 @@ export default function App() {
         if (type === 'login') {
             const found = db.users.find(x => x.username === f.username.trim().toLowerCase() && x.password === f.password);
             if (!found) {
-                setLoginError('Username or password is incorrect. Check the demo accounts below the form.');
+                setLoginError('Username or password is incorrect.');
                 return;
             }
             update(copy => {
@@ -938,7 +938,6 @@ export default function App() {
                         <Field label="Password" required><span className="login-input-wrap relative block"><Lock className="login-input-icon pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" /><Input name="password" type="password" autoComplete="current-password" placeholder=" " required className="w-full pl-9" /></span></Field>
                         {loginError && <Notice kind="error">{loginError}</Notice>}
                         <Button type="submit" tone="primary" className="w-full"><LogIn className="h-4 w-4" aria-hidden="true" />Sign in</Button>
-                        <Notice><><b>Demo accounts</b><br />hr.admin / admin123 (Administrator)<br />hr.staff / staff123 (HR Staff)</></Notice>
                     </form>
                 </section>
             </div>
