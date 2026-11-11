@@ -210,3 +210,22 @@ describe('helpers', () => {
     expect(isDB({})).toBe(false);
   });
 });
+
+describe('migrateDtr for saved payroll records', () => {
+    it('gives records saved before the late deduction a zero late amount', () => {
+        const db = seed();
+        db.payroll = db.payroll.map(({ lateMin, lateDays, lateDed, ...rest }) => rest);
+        migrateDtr(db);
+        db.payroll.forEach((r) => {
+            expect(r.lateDed).toBe(0);
+            expect(r.lateDays).toBe(0);
+        });
+    });
+
+    it('keeps late amounts that records already have', () => {
+        const db = seed();
+        const before = db.payroll.map((r) => r.lateDed);
+        migrateDtr(db);
+        expect(db.payroll.map((r) => r.lateDed)).toEqual(before);
+    });
+});

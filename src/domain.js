@@ -200,6 +200,7 @@ export function dtrStatus(record) {
     return record.absent > 0 ? 'Absent' : record.lateMin > 0 ? 'Late' : 'Present';
 }
 export function migrateDtr(db) {
+    db.payroll = db.payroll.map(r => ({ lateMin: 0, lateDays: 0, lateDed: 0, ...r }));
     if (!db.dtr.some(d => d.date !== undefined))
         return db;
     const schedule = db.schedules[0], late = (d) => (d.amIn ? Math.max(0, mins(d.amIn) - mins(schedule.amIn)) : 0) + (d.pmIn ? Math.max(0, mins(d.pmIn) - mins(schedule.pmIn)) : 0);
