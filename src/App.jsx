@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import lguLogo from './assets/lgu_logo.png';
 import DashboardPage from './components/dashboard/Page';
+import Dialog from './components/ui/Dialog';
 import NotificationContainer from './components/notifications/Container';
 import { createPayroll, cscLateDays, dtrStatus, migrateDtr, DOC_TYPES, ename, fd, fm, fm0, fdr, ini, loadDB, calcLeaveAccrual, isDB, migrateLeaveApprovals, NAV, nid, periodById, periods, r2, saveDB, seed, sgName, todayISO, t12, workdays, } from './domain';
 const classes = (...v) => v.filter(Boolean).join(' ');
@@ -139,12 +140,6 @@ export default function App() {
         if (NAV.some(n => n[0] === location.hash.slice(1)))
             setPage(location.hash.slice(1));
         return () => window.removeEventListener('hashchange', onHash);
-    }, []);
-    useEffect(() => {
-        const esc = (e) => {
-            if (e.key === 'Escape')
-                setModal(null);
-        }; window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc);
     }, []);
     const update = (fn) => setDb(old => { const copy = structuredClone(old); fn(copy); return copy; });
     const notify = (title, message, error = false) => {
@@ -977,15 +972,5 @@ export default function App() {
         <NotificationContainer notifications={toasts} />
         {renderModal()}
     </>;
-}
-function Dialog({ children, title, subtitle, onClose }) {
-    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-6" onMouseDown={e => {
-        if (e.target === e.currentTarget)
-            onClose();
-    }}>
-        <section role="dialog" aria-modal="true" aria-label={title} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-line bg-card p-5 shadow-2xl sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold">{title}</h2>{subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}</div><button className="rounded-md px-2 py-1 text-xl leading-none text-muted hover:bg-interactive-hover hover:text-interactive-hover-text" aria-label="Close dialog" onClick={onClose}>×</button></div>{children}
-        </section>
-    </div>;
 }
 function D(value) { return new Date(value + 'T00:00:00'); }
